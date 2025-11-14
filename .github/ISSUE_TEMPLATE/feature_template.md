@@ -2,22 +2,16 @@
 name: feature_template
 about: 기능 개발 이슈 템플릿
 title: "[FEATURE]"
-labels: ''
+labels: 'feat'
 assignees: ''
 
 ---
 
----
-name: "Feature Template"
-about: 기능 개발을 위한 이슈 템플릿입니다.
-title: "[FEATURE] 이슈 내용 설명"
-labels: feat
-assignees: ""
----
+### 설명
 
-### Description
+> 기능에 대한 간단한 설명
 
-### TODO List
+### 할일
 
 - [ ] TODO
 
