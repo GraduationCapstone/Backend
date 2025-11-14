@@ -2,7 +2,7 @@
 name: fix_template
 about: 버그 수정 시 사용
 title: "[BUG]"
-labels: 'bug'
+labels: bug
 assignees: ''
 
 ---

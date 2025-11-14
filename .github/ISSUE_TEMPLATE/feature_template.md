@@ -2,10 +2,11 @@
 name: feature_template
 about: 새로운 기능을 추가하거나 기존 기능(성능)을 개선할 때 사용
 title: "[FEATURE]"
-labels: 'feat'
+labels: ''
 assignees: ''
 
 ---
+
 ### 요청 유형
 
 > 해당되는 항목을 선택해주세요.
