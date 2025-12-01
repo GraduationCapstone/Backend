@@ -26,17 +26,15 @@ public class User {
     @Column(columnDefinition = "boolean default false")
     private boolean deleted;
 
-    public void update(String username) {
-        this.username = username;
-    }
-
     public void deleted(boolean deleted) {
         this.deleted = deleted;
     }
 
     public void reactivate() {
+        this.deleted = false;
     }
 
     public void updateUsername(String username) {
+        this.username = username;
     }
 }
