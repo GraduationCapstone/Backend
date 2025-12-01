@@ -1,0 +1,37 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST}:${MYSQL_PORT}/${MYSQL_DATABASE_NAME}?serverTimezone=UTC&characterEncoding=UTF-8
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+    username: ${MYSQL_USERNAME}
+    password: ${MYSQL_PASSWORD}
+
+  jpa:
+    hibernate:
+      # create-drop: 애플리케이션 시작 시 기존 테이블 삭제 후 재생성
+      # update: 변경된 스키마만 업데이트
+      # validate: 로딩 시 엔티티와 테이블이 일치하는지 확인
+      ddl-auto: create
+      show-sql: true
+      properties:
+        hibernate:
+          format_sql: true
+
+
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: ${CLIENT_ID}
+            client-secret: ${CLIENT_secrets}
+            scope: read:user, user:email, repos
+            redirect-uri: http://localhost:8080/login/oauth2/code/github
+
+jwt:
+  secret: ${JWT_SECRET_KEY}
+  access-token-expiration-minutes: 30
+  refresh-token-expiration-days: 7
+
+oauth2:
+  frontend-redirect-url: ${FRONTEND_REDIRECT_URL}
