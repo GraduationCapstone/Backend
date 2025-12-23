@@ -1,6 +1,6 @@
 package com.graduationCapstone.Probe.global.security.login.service;
 
-import com.graduationCapstone.Probe.global.security.jwt.util.JwtTokenProvider;
+import com.graduationCapstone.Probe.global.security.jwt.util.JwtUtil;
 import com.graduationCapstone.Probe.global.security.login.dto.TokenResponseDto;
 import com.graduationCapstone.Probe.global.security.login.entity.RefreshToken;
 import com.graduationCapstone.Probe.global.security.login.repository.RefreshTokenRepository;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 @Transactional
 public class LoginService {
 
-    private final JwtTokenProvider tokenProvider;
+    private final JwtUtil tokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
 
     // 토큰 재발급 로직

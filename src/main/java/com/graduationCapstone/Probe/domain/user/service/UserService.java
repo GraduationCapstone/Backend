@@ -2,6 +2,8 @@ package com.graduationCapstone.Probe.domain.user.service;
 
 import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.domain.user.repository.UserRepository;
+import com.graduationCapstone.Probe.global.exception.ErrorCode;
+import com.graduationCapstone.Probe.global.exception.handler.CustomException;
 import com.graduationCapstone.Probe.global.security.login.repository.RefreshTokenRepository;
 import com.graduationCapstone.Probe.global.security.oauth.dto.OAuth2ResponseDto;
 import lombok.RequiredArgsConstructor;
@@ -25,14 +27,14 @@ public class UserService {
     @Transactional
     public void saveOrUpdateUser(OAuth2ResponseDto attributes) {
 
-        Optional<User> existingUser = userRepository.findByGithubIdAndDeletedFalse(attributes.githubId());
+        Optional<User> existingUser = userRepository.findByGithubId(attributes.githubId());
 
         User user;
 
         if (existingUser.isPresent()) {
             user = existingUser.get();
 
-            // 만약 탈퇴 계정이라면 재활성화
+            // 탈퇴 계정이라면 재활성화
             if (user.isDeleted()) {
                 user.reactivate();
                 user.updateUsername(attributes.username());
@@ -52,13 +54,11 @@ public class UserService {
     public void deleteUser(Long userId){
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        refreshTokenRepository.deleteById(userId);
+        refreshTokenRepository.deleteByUserId(userId);
 
         user.deleted(true);
-
-        userRepository.save(user);
     }
 
 }

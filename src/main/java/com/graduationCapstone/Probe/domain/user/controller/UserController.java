@@ -55,7 +55,7 @@ public class UserController {
             @ApiResponse(responseCode = "401", description = "인증 실패 (유효하지 않거나 만료된 토큰)"),
             @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음 (논리적 삭제 과정 중)")
     })
-    @DeleteMapping("/delete")
+    @DeleteMapping("/me")
     public ResponseEntity<Void> delete(@AuthenticationPrincipal User user) {
         Long userId = user.getId();
         userService.deleteUser(userId);

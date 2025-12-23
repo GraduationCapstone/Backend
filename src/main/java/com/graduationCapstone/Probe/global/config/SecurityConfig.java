@@ -46,14 +46,14 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        // 모든 경로에 대해 인증 없이 허용(CORS Preflight 처리)
+                        // 모든 경로에 대해 인증 없이 허용
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // GET, POST 등 일반 요청에 대해 인증 없이 접근 허용 경로(추후 수정 예정)
+                        // GET, POST 등 일반 요청에 대해 인증 없이 접근 허용 경로
                         .requestMatchers(
                                 "/",
                                 "/oauth2/**",
                                 "/login/**",
-                                "/api/auth/**",
+                                "/api/auth/reissue",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**"
                         ).permitAll()

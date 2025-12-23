@@ -1,6 +1,6 @@
 package com.graduationCapstone.Probe.global.security.jwt.filter;
 
-import com.graduationCapstone.Probe.global.security.jwt.util.JwtTokenProvider;
+import com.graduationCapstone.Probe.global.security.jwt.util.JwtUtil;
 import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.domain.user.repository.UserRepository;
 import jakarta.servlet.FilterChain;
@@ -23,7 +23,7 @@ import java.util.Collections;
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final JwtTokenProvider jwtTokenProvider;
+    private final JwtUtil jwtTokenProvider;
     private final UserRepository userRepository;
 
     private static final String AUTHORIZATION_HEADER = "Authorization";

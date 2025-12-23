@@ -12,13 +12,13 @@ import java.util.Date;
 
 @Slf4j
 @Component
-public class JwtTokenProvider {
+public class JwtUtil {
 
     private final Key key;
     private final long accessTokenValidityInMilliseconds;
     private final long refreshTokenValidityInMilliseconds;
 
-    public JwtTokenProvider(
+    public JwtUtil(
             @Value("${jwt.secret}") String secretKey,
             @Value("${jwt.access-token-expiration-minutes}") long accessExpirationMinutes,
             @Value("${jwt.refresh-token-expiration-days}") long refreshExpirationDays) {
@@ -60,13 +60,13 @@ public class JwtTokenProvider {
         Date validityDate = new Date(now.getTime() + validity);
 
         Claims claims = Jwts.claims().setSubject(String.valueOf(userId));
-        // claims.put("role", role); // Role을 사용하지 않으므로 주석 처리함
+        claims.put("role", "ROLE_USER");
 
         return Jwts.builder()
-                .setClaims(claims) // 정보 저장
-                .setIssuedAt(now) // 토큰 발행 시간
-                .setExpiration(validityDate) // 토큰 만료 시간
-                .signWith(key, SignatureAlgorithm.HS256) // 서명 키, 알고리즘 설정
+                .setClaims(claims)
+                .setIssuedAt(now)
+                .setExpiration(validityDate)
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -94,13 +94,13 @@ public class JwtTokenProvider {
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
             return true;
         } catch (io.jsonwebtoken.security.SecurityException | MalformedJwtException e) {
-            log.info("잘못된 JWT 서명입니다.");
+            log.warn("잘못된 JWT 서명입니다.");
         } catch (ExpiredJwtException e) {
-            log.info("만료된 JWT 토큰입니다.");
+            log.warn("만료된 JWT 토큰입니다.");
         } catch (UnsupportedJwtException e) {
-            log.info("지원되지 않는 JWT 토큰입니다.");
+            log.warn("지원되지 않는 JWT 토큰입니다.");
         } catch (IllegalArgumentException e) {
-            log.info("잘못된 JWT 토큰입니다.");
+            log.warn("잘못된 JWT 토큰입니다.");
         }
         return false;
     }
