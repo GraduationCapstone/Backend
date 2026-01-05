@@ -13,16 +13,16 @@ import org.springframework.stereotype.Service;
 @Transactional
 public class LoginService {
 
-    private final JwtUtil tokenProvider;
+    private final JwtUtil jwtUtil;
     private final RefreshTokenRepository refreshTokenRepository;
 
     // 토큰 재발급 로직
     public TokenResponseDto reissue(String refreshToken) {
-        if (!tokenProvider.validateToken(refreshToken)) {
+        if (!jwtUtil.validateToken(refreshToken)) {
             throw new RuntimeException("RefreshToken이 유효하지 않습니다.");
         }
 
-        Long userId = tokenProvider.getUserId(refreshToken); //토큰에서 userId 추출
+        Long userId = jwtUtil.getUserId(refreshToken); //토큰에서 userId 추출
 
         RefreshToken storedToken = refreshTokenRepository.findById(userId) // User ID로 RefreshToken 값 가져옴
                 .orElseThrow(() -> new RuntimeException("로그아웃 된 사용자입니다."));
@@ -31,8 +31,8 @@ public class LoginService {
             throw new RuntimeException("토큰의 유저 정보가 일치하지 않습니다.");
         }
 
-        String newAccessToken = tokenProvider.createAccessToken(userId);
-        String newRefreshToken = tokenProvider.createRefreshToken(userId);
+        String newAccessToken = jwtUtil.createAccessToken(userId);
+        String newRefreshToken = jwtUtil.createRefreshToken(userId);
 
         storedToken.updateToken(newRefreshToken);
 
@@ -41,7 +41,7 @@ public class LoginService {
 
     // 로그아웃 로직
     public void logout(String accessToken) {
-        Long userId = tokenProvider.getUserId(accessToken);
+        Long userId = jwtUtil.getUserId(accessToken);
         refreshTokenRepository.deleteById(userId);
     }
 }
