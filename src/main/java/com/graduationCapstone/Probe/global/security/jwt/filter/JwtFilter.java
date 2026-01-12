@@ -25,9 +25,11 @@ public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtTokenProvider;
     private final UserRepository userRepository;
+    private final CookieUtil cookieUtil;
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String ACCESS_TOKEN_COOKIE_NAME = "access_token";
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
@@ -46,7 +48,6 @@ public class JwtFilter extends OncePerRequestFilter {
             User user = userRepository.findByIdAndDeletedFalse(userId).orElse(null);
 
             if (user != null) {
-
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         user,
                         null, // 비밀번호 필요 없음
@@ -54,7 +55,6 @@ public class JwtFilter extends OncePerRequestFilter {
                 );
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         }
@@ -69,6 +69,16 @@ public class JwtFilter extends OncePerRequestFilter {
         String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
         if (bearerToken != null && bearerToken.startsWith(BEARER_PREFIX)) {
             return bearerToken.substring(BEARER_PREFIX.length());
+        }
+
+        // 헤더에 없다면 쿠키에서 추출 시도
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (ACCESS_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
         }
         return null;
     }
