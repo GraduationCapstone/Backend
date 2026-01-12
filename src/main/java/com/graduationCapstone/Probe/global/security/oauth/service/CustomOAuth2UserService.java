@@ -5,6 +5,7 @@ import com.graduationCapstone.Probe.global.security.oauth.dto.OAuth2ResponseDto;
 import com.graduationCapstone.Probe.global.security.oauth.util.OAuth2Util;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -24,11 +25,13 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     private final UserService userService;
     private final OAuth2Util oAuth2Util;
 
+    @Setter
+    private OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate = new DefaultOAuth2UserService();
+
     @Override
     @Transactional
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
 
-        OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate = new DefaultOAuth2UserService();
         OAuth2User oAuth2User = delegate.loadUser(userRequest);
 
         Map<String, Object> attributes = oAuth2User.getAttributes();

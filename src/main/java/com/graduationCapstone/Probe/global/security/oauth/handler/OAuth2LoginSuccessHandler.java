@@ -22,7 +22,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
-    private final JwtUtil tokenProvider;
+    private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
     private final RefreshTokenService refreshTokenService;
     private final CookieUtil cookieUtil;
@@ -40,8 +40,8 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         User user = userRepository.findByGithubIdAndDeletedFalse(githubId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보를 찾을 수 없습니다."));
 
-        String accessToken = tokenProvider.createAccessToken(user.getId());
-        String refreshToken = tokenProvider.createRefreshToken(user.getId());
+        String accessToken = jwtUtil.createAccessToken(user.getId());
+        String refreshToken = jwtUtil.createRefreshToken(user.getId());
 
         refreshTokenService.saveOrUpdate(
                 new RefreshTokenSaveDto(
