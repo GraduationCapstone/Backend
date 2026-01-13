@@ -6,6 +6,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.stream.Stream;
+
 @Component
 public class CookieUtil {
 
@@ -67,5 +71,16 @@ public class CookieUtil {
         cookie.setPath("/");
         cookie.setMaxAge((int) (accessTokenExpirationMinutes * 60));
         response.addCookie(cookie);
+    }
+
+    // 특정 이름의 쿠키 값을 추출
+    public String getCookieValue(HttpServletRequest request, String name) {
+        return Optional.ofNullable(request.getCookies())
+                .map(Arrays::stream)
+                .orElseGet(Stream::empty)
+                .filter(cookie -> name.equals(cookie.getName()))
+                .map(Cookie::getValue)
+                .findFirst()
+                .orElse(null);
     }
 }
