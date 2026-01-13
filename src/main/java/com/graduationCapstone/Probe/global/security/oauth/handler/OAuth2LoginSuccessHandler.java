@@ -43,17 +43,12 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         String accessToken = jwtUtil.createAccessToken(user.getId());
         String refreshToken = jwtUtil.createRefreshToken(user.getId());
 
-        refreshTokenService.saveOrUpdate(
-                new RefreshTokenSaveDto(
-                        user.getId(),
-                        refreshToken
-                )
-        );
-
+        refreshTokenService.saveOrUpdate(new RefreshTokenSaveDto(user.getId(), refreshToken));
         cookieUtil.addRefreshCookie(response, refreshToken);
 
+        cookieUtil.addAccessCookie(response, accessToken);
+
         String targetUrl = UriComponentsBuilder.fromUriString(FRONTEND_REDIRECT_URL)
-                .queryParam("accessToken", accessToken)
                 .build().toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);

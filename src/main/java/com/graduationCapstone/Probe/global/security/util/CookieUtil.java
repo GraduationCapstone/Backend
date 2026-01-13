@@ -12,7 +12,11 @@ public class CookieUtil {
     @Value("${jwt.refresh-token-expiration-days}")
     private long refreshTokenExpirationDays;
 
+    @Value("${jwt.access-token-expiration-minutes}")
+    private long accessTokenExpirationMinutes;
+
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
+    public static final String ACCESS_TOKEN_COOKIE_NAME = "access_token";
 
 
     // Refresh Token 쿠키 생성
@@ -53,5 +57,15 @@ public class CookieUtil {
             }
         }
         return null;
+    }
+
+    // Access Token 쿠키 생성
+    public void addAccessCookie(HttpServletResponse response, String accessToken) {
+        Cookie cookie = new Cookie(ACCESS_TOKEN_COOKIE_NAME, accessToken);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false);  // 로컬 개발 환경이므로 false, 배포시 true 설정하여 HTTPS 환경에서만 쿠키가 전송되도록
+        cookie.setPath("/");
+        cookie.setMaxAge((int) (accessTokenExpirationMinutes * 60));
+        response.addCookie(cookie);
     }
 }
