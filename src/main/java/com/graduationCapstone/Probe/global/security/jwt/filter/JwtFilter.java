@@ -3,8 +3,10 @@ package com.graduationCapstone.Probe.global.security.jwt.filter;
 import com.graduationCapstone.Probe.global.security.jwt.util.JwtUtil;
 import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.domain.user.repository.UserRepository;
+import com.graduationCapstone.Probe.global.security.util.CookieUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.NonNull;
@@ -23,7 +25,7 @@ import java.util.Collections;
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtTokenProvider;
+    private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
     private final CookieUtil cookieUtil;
 
@@ -42,9 +44,9 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String jwt = resolveToken(request);
 
-        if (jwt != null && jwtTokenProvider.validateToken(jwt)) {
+        if (jwt != null && jwtUtil.validateToken(jwt)) {
 
-            Long userId = jwtTokenProvider.getUserId(jwt);
+            Long userId = jwtUtil.getUserId(jwt);
             User user = userRepository.findByIdAndDeletedFalse(userId).orElse(null);
 
             if (user != null) {
@@ -72,14 +74,6 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         // 헤더에 없다면 쿠키에서 추출 시도
-        Cookie[] cookies = request.getCookies();
-        if (cookies != null) {
-            for (Cookie cookie : cookies) {
-                if (ACCESS_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-        return null;
+        return cookieUtil.getCookieValue(request, ACCESS_TOKEN_COOKIE_NAME);
     }
 }
