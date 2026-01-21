@@ -36,3 +36,6 @@ src/main/resources/application-dev.yml
 
 ### VS Code ###
 .vscode/
+
+application.yml
+application.properties
