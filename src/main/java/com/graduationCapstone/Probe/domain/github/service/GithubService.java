@@ -3,6 +3,7 @@ package com.graduationCapstone.Probe.domain.github.service;
 import com.graduationCapstone.Probe.domain.github.dto.GithubFileDto;
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoDto;
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoSummaryDto;
+import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
@@ -100,6 +101,7 @@ public class GithubService {
     /**
      * GitHub Blob API를 사용하여 개별 파일의 원본 데이터를 획득합니다.
      * 인코딩 문제를 방지하기 위해 byte array로 수신 후 UTF-8 문자열로 변환합니다.
+     * 특정 파일 로드 실패 시 전체 공정을 멈추지 않고 에러 메시지로 대체합니다.
      *
      * @param apiUrl   GitHub Blob API URL
      * @param fileName 파일 경로 및 이름
@@ -112,8 +114,9 @@ public class GithubService {
                 .bodyToMono(byte[].class)
                 .map(bytes -> new GithubFileDto(fileName, new String(bytes, StandardCharsets.UTF_8)))
                 .onErrorResume(e -> {
-                    System.err.println("File Error (" + fileName + "): " + e.getMessage());
-                    return Mono.just(new GithubFileDto(fileName, "내용을 불러올 수 없습니다: " + e.getMessage()));
+                    // 시스템 로그에만 원인 출력한 뒤 계속 나머지 파일들 불러오도록 함
+                    System.err.println("[GitHub API Error] 파일 로드 실패: " + fileName + " | 사유: " + e.getMessage());
+                    return Mono.just(new GithubFileDto(fileName, ErrorCode.FILE_NOT_FOUND.getMessage()));
                 });
     }
 

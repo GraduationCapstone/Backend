@@ -28,6 +28,7 @@ public enum ErrorCode {
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "RESOURCE40401", "요청한 리소스를 찾을 수 없습니다."),
     REFRESH_TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND, "RFTOKEN40401", "로그아웃 된 사용자입니다."),
     REPOSITORY_NOT_FOUND(HttpStatus.NOT_FOUND, "REPO40401", "레포지토리 데이터가 비어있습니다"),
+    FILE_NOT_FOUND(HttpStatus.NOT_FOUND, "FILE40401", "해당 파일을 찾을 수 없거나 불러올 수 없습니다"),
 
     // 405 METHOD NOT ALLOWED (지원하지 않는 HTTP 메서드)
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "METHOD40501", "지원하지 않는 HTTP 메서드입니다."),
