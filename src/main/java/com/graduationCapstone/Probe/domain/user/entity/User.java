@@ -32,6 +32,10 @@ public class User {
     @Column(name = "deleted", columnDefinition = "boolean default false")
     private boolean deleted;
 
+    @Comment("회원의 Github 접근을 위한 AccessToken")
+    @Column(name = "github_access_token")
+    private String githubAccessToken;
+
     public void deleted(boolean deleted) {
         this.deleted = deleted;
     }
@@ -42,5 +46,9 @@ public class User {
 
     public void updateUsername(String username) {
         this.username = username;
+    }
+
+    public void updateGithubAccessToken(String token) {
+        this.githubAccessToken = token;
     }
 }
