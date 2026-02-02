@@ -4,8 +4,10 @@ import com.graduationCapstone.Probe.domain.github.dto.GithubFileDto;
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoDto;
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoSummaryDto;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
+import com.graduationCapstone.Probe.global.exception.handler.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -36,7 +38,9 @@ public class GithubService {
                 .uri("/user/repos?sort=updated&per_page=30")
                 .headers(h -> h.setBearerAuth(token))
                 .retrieve()
-                .bodyToFlux(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                .onStatus(status -> status.equals(HttpStatus.UNAUTHORIZED),
+                        response -> Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS)))
+                .bodyToFlux(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .map(repo -> new GithubRepoSummaryDto(
                         (String) repo.get("name"),
                         (String) ((Map<?, ?>) repo.get("owner")).get("login"),
@@ -46,7 +50,9 @@ public class GithubService {
                         repo.get("stargazers_count") != null ? (int) repo.get("stargazers_count") : 0,
                         repo.get("open_issues_count") != null ? (int) repo.get("open_issues_count") : 0
                 ))
-                .collectList();
+                .collectList()
+                .onErrorMap(e -> !(e instanceof CustomException),
+                        e -> new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
     }
 
     /**
@@ -72,8 +78,7 @@ public class GithubService {
                             .uri("/repos/{owner}/{repo}/git/trees/{branch}?recursive=1", owner, repo, defaultBranch)
                             .headers(h -> h.setBearerAuth(token))
                             .retrieve()
-                            .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
-                            })
+                            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                             .flatMap(response -> {
                                 Object treeObj = response.get("tree");
                                 if (!(treeObj instanceof List)) {
@@ -89,8 +94,8 @@ public class GithubService {
                                         .flatMap(node -> {
                                             String path = (String) node.get("path");
                                             String apiUrl = (String) node.get("url");
-                                            return fetchFileContent(apiUrl, path);
-                                        })
+                                            return fetchFileContent(apiUrl, path, token);
+                                        }, 10)
                                         .collectList()
                                         .map(files -> new GithubRepoDto(repo, files));
                             })
@@ -107,9 +112,13 @@ public class GithubService {
      * @param fileName 파일 경로 및 이름
      * @return 파일 이름과 내용이 포함된 GithubFileDto를 담은 Mono
      */
-    private Mono<GithubFileDto> fetchFileContent(String apiUrl, String fileName) {
+    private Mono<GithubFileDto> fetchFileContent(String apiUrl, String fileName, String token) {
         return webClient.get()
                 .uri(apiUrl)
+                .headers(h -> {
+                    h.setBearerAuth(token);
+                    h.set("Accept", "application/vnd.github.v3.raw");
+                })
                 .retrieve()
                 .bodyToMono(byte[].class)
                 .map(bytes -> new GithubFileDto(fileName, new String(bytes, StandardCharsets.UTF_8)))

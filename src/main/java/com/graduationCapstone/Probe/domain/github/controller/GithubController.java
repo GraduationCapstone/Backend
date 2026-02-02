@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
@@ -35,10 +37,10 @@ public class GithubController {
 
     /**
      * 인증된 사용자의 GitHub 레포지토리 목록을 조회합니다.
-     * 클라이언트 UI에서 테스트할 레포지토리를 선택할 수 있도록 요약된 정보를 반환합니다.
+     * 비동기 스트림 내에서 사용자의 최신 액세스 토큰을 확인하여 GitHub API로부터 레포지토리 요약 정보를 가져옵니다.
      *
      * @param user 인증된 사용자 정보 (@AuthenticationPrincipal)
-     * @return 사용자의 레포지토리 요약 정보 리스트 (200 OK)
+     * @return 사용자의 레포지토리 요약 정보 리스트를 포함한 Mono (200 OK)
      */
     @Operation(
             summary = "레포지토리 목록 조회",
@@ -49,26 +51,32 @@ public class GithubController {
             @ApiResponse(responseCode = "500", description = "서버 내부 에러")
     })
     @GetMapping("/repos/list")
-    public ResponseEntity<List<GithubRepoSummaryDto>> getRepoList(@AuthenticationPrincipal User user) {
-        String token = getValidToken(user);
-        if (token == null) {
-            throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
+    public Mono<ResponseEntity<List<GithubRepoSummaryDto>>> getRepoList(@AuthenticationPrincipal User user) {
+        if (user == null) {
+            return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));
         }
-        try {
-            List<GithubRepoSummaryDto> repos = githubService.getRepoList(token).block();
-            return ResponseEntity.ok(repos);
-        } catch (Exception e) {
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
+
+        final Long userId = user.getId();
+
+        return Mono.defer(() -> Mono.fromCallable(() -> userRepository.findById(userId)
+                                .map(User::getGithubAccessToken)
+                                .orElseThrow(() -> new CustomException(ErrorCode.UNAUTHORIZED_ACCESS)))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMap(githubService::getRepoList)
+                    .map(ResponseEntity::ok)
+        ).onErrorResume(e -> {
+            if (e instanceof CustomException) return Mono.error(e);
+            return Mono.error(new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
+        });
     }
 
     /**
      * 사용자가 선택한 특정 레포지토리의 모든 소스 코드를 추출합니다.
-     * 해당 레포지토리의 전체 디렉토리를 재귀적으로 탐색하여 파일명과 파일 내용을 가져옵니다.
+     * 해당 레포지토리의 전체 디렉토리를 재귀적으로 탐색하며, 각 파일의 원문 코드를 추출하여 반환합니다.
      *
-     * @param user     인증된 사용자 정보
-     * @param repoName 테스트를 위해 선택한 레포지토리 이름
-     * @return 선택된 레포지토리 이름과 파일 리스트를 포함한 GithubRepoDto (200 OK)
+     * @param user     인증된 사용자 정보 (@AuthenticationPrincipal)
+     * @param repoName 추출 대상 레포지토리 이름
+     * @return 선택된 레포지토리 정보와 파일 리스트를 포함한 Mono (200 OK)
      */
     @Operation(
             summary = "선택된 레포지토리 전체 코드 추출",
@@ -84,42 +92,31 @@ public class GithubController {
             @ApiResponse(responseCode = "500", description = "추출 중 서버 에러")
     })
     @GetMapping("/repos/{repoName}/code")
-    public ResponseEntity<GithubRepoDto> getFullCode(
+    public Mono<ResponseEntity<GithubRepoDto>> getFullCode(
             @AuthenticationPrincipal User user,
             @Parameter(description = "추출할 레포지토리 이름", example = "Probe")
             @PathVariable String repoName) {
 
-        String token = getValidToken(user);
-        if (token == null) {
-            throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
-        }
+        if (user == null) return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));
 
-        try {
-            User freshUser = userRepository.findById(user.getId())
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-            GithubRepoDto repoData = githubService.getRepoFullCode(freshUser.getUsername(), repoName, token).block();
+        final Long userId = user.getId();
 
-            if (repoData == null) {
-                throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
-            }
+        return Mono.defer(() -> Mono.fromCallable(() -> userRepository.findById(userId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(freshUser -> {
+                    String token = freshUser.getGithubAccessToken();
+                    if (token == null) return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));
 
-            return ResponseEntity.ok(repoData);
-        } catch (CustomException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    /**
-     * 사용자의 유효한 GitHub AccessToken을 데이터베이스에서 조회합니다.
-     *
-     * @param user 인증된 사용자 정보
-     * @return 유효한 액세스 토큰 문자열, 없을 경우 null 반환
-     */
-    private String getValidToken(User user) {
-        return userRepository.findById(user.getId())
-                .map(User::getGithubAccessToken)
-                .orElse(null);
+                    return githubService.getRepoFullCode(freshUser.getUsername(), repoName, token);
+                })
+                .map(repoData -> {
+                    if (repoData == null) throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
+                    return ResponseEntity.ok(repoData);
+                })
+        ).onErrorResume(e -> {
+            if (e instanceof CustomException) return Mono.error(e);
+            return Mono.error(new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
+        });
     }
 }

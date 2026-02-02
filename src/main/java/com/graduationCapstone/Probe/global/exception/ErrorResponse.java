@@ -20,16 +20,24 @@ public record ErrorResponse(
                              long timestamp,
 
                              @Schema(description = "필드 유효성 검사 실패 목록")
-                             String errors
+                             String errors,
+
+                             @Schema(description = "GitHub 토큰 만료 시 리다이렉트 경로")
+                             String redirectUrl
 ) {
 
     // CustomException 처리
     public ErrorResponse(int status, String code, String message) {
-        this(status, code, message, System.currentTimeMillis(), null);
+        this(status, code, message, System.currentTimeMillis(), null, null);
     }
 
     // 일반적인 예외 처리
     public ErrorResponse(HttpStatus httpStatus, String message) {
-        this(httpStatus.value(), String.valueOf(httpStatus.value()), message, System.currentTimeMillis(), null);
+        this(httpStatus.value(), String.valueOf(httpStatus.value()), message, System.currentTimeMillis(), null, null);
+    }
+
+    // 리다이렉트 경로 포함 예외 처리 (GitHub 토큰 만료 시 사용)
+    public ErrorResponse(int status, String code, String message, String redirectUrl) {
+        this(status, code, message, System.currentTimeMillis(), null, redirectUrl);
     }
 }

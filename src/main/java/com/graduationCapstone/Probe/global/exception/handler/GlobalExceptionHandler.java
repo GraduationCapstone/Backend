@@ -29,10 +29,16 @@ public class GlobalExceptionHandler {
 
         log.warn("Custom Exception [{}]: {}", errorCode.getCode(), e.getMessage());
 
+        String redirectUrl = null;
+        if (errorCode == ErrorCode.UNAUTHORIZED_ACCESS) {
+            redirectUrl = "/oauth2/authorization/github";
+        }
+
         ErrorResponse errorResponse = new ErrorResponse(
                 status,
                 errorCode.getCode(),
-                e.getMessage()
+                e.getMessage(),
+                redirectUrl
         );
 
         return new ResponseEntity<>(errorResponse, errorCode.getHttpStatus());
