@@ -4,6 +4,8 @@ import com.graduationCapstone.Probe.global.security.jwt.handler.JwtAuthenticatio
 import com.graduationCapstone.Probe.global.security.oauth.handler.OAuth2LoginSuccessHandler;
 import com.graduationCapstone.Probe.global.security.jwt.filter.JwtFilter;
 import com.graduationCapstone.Probe.global.security.oauth.service.CustomOAuth2UserService;
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,6 +31,13 @@ public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
 
+    @PostConstruct
+    public void setup() {
+        org.springframework.security.core.context.SecurityContextHolder.setStrategyName(
+                org.springframework.security.core.context.SecurityContextHolder.MODE_INHERITABLETHREADLOCAL
+        );
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
@@ -46,6 +55,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         // 모든 경로에 대해 인증 없이 허용
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // GET, POST 등 일반 요청에 대해 인증 없이 접근 허용 경로
@@ -57,6 +67,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**"
                         ).permitAll()
+                        .requestMatchers("/api/github/**").authenticated()
                         .anyRequest().authenticated()
                 )
 
