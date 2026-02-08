@@ -5,7 +5,6 @@ import com.graduationCapstone.Probe.domain.github.dto.GithubRepoDto;
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoSummaryDto;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import com.graduationCapstone.Probe.global.exception.handler.CustomException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,13 +17,17 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class GithubService {
 
-    private final WebClient webClient = WebClient.builder()
-            .baseUrl("https://api.github.com")
-            .defaultHeader("Accept", "application/vnd.github.v3+json")
-            .build();
+    private final WebClient webClient;
+
+    /**
+     * 생성자 직접 작성: 테스트 코드에서 외부 WebClient 주입을 허용하기 위함입니다.
+     * @param webClient 설정된 WebClient 객체
+     */
+    public GithubService(WebClient webClient) {
+        this.webClient = webClient;
+    }
 
     /**
      * 사용자의 GitHub 레포지토리 목록을 description, language, fork 개수, star 개수, issue 개수 정보와 함께 가져옵니다.
