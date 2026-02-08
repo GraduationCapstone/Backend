@@ -44,13 +44,15 @@ class GithubServiceTest {
     @Test
     @DisplayName("GitHub 레포지토리 전체 코드 추출 로직을 검증합니다.")
     void getRepoFullCodeTest() {
+        String mockBaseUrl = mockWebServer.url("/").toString();
+
         mockWebServer.enqueue(new MockResponse()
                 .setHeader("Content-Type", "application/json")
                 .setBody("{\"default_branch\":\"main\"}"));
 
         mockWebServer.enqueue(new MockResponse()
                 .setHeader("Content-Type", "application/json")
-                .setBody("{\"tree\": [{\"path\":\"src/Main.java\", \"type\":\"blob\", \"url\":\"http://localhost/api/blob\"}]}"));
+                .setBody("{\"tree\": [{\"path\":\"src/Main.java\", \"type\":\"blob\", \"url\":\"" + mockBaseUrl + "api/blob\"}]}"));
 
         mockWebServer.enqueue(new MockResponse()
                 .setHeader("Content-Type", "application/json")
