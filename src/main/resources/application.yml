@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: Probe
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: ${GH_CLIENT_ID}
+            client-secret: ${GH_CLIENT_SECRET}
+            scope:
+              - read:user
+              - user:email
+              - repo
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-minutes: 30
+  refresh-token-expiration-days: 7
+
+oauth2:
+  frontend-redirect-url: ${FRONTEND_REDIRECT_URL}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
