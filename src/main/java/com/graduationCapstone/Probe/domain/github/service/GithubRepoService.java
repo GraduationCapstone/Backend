@@ -25,13 +25,13 @@ public class GithubRepoService {
     @Transactional
     public Mono<GithubRepoResponseDto> upsertRepo(User user, GithubRepoSummaryDto dto) {
         return Mono.fromCallable(() -> {
-            GithubRepo repo = githubRepoRepository.findByUserIdAndName(user.getId(), dto.name())
+            GithubRepo repo = githubRepoRepository.findByUserIdAndRepoName(user.getId(), dto.repoName())
                     .map(existing -> {
                         existing.updateFromSummary(dto);
                         return existing;
                     })
                     .orElseGet(() -> GithubRepo.builder()
-                            .name(dto.name()).owner(dto.owner()).description(dto.description())
+                            .repoName(dto.repoName()).owner(dto.owner()).description(dto.description())
                             .language(dto.language()).forksCount(dto.forksCount())
                             .stargazersCount(dto.stargazersCount()).openIssuesCount(dto.openIssuesCount())
                             .user(user).build());
@@ -61,7 +61,7 @@ public class GithubRepoService {
 
     private GithubRepoResponseDto mapToResponse(GithubRepo repo) {
         return new GithubRepoResponseDto(
-                repo.getId(), repo.getName(), repo.getOwner(), repo.getDescription(),
+                repo.getId(), repo.getRepoName(), repo.getOwner(), repo.getDescription(),
                 repo.getLanguage(), repo.getForksCount(), repo.getStargazersCount(), repo.getOpenIssuesCount()
         );
     }

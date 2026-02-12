@@ -37,7 +37,7 @@ class GithubServiceTest {
 
         githubService.getRepoList("token")
                 .as(StepVerifier::create)
-                .expectNextMatches(list -> list.getFirst().name().equals("Probe"))
+                .expectNextMatches(list -> list.getFirst().repoName().equals("Probe"))
                 .verifyComplete();
     }
 
@@ -61,7 +61,7 @@ class GithubServiceTest {
         // StepVerifier에 타임아웃을 걸어 무한 대기 방지
         githubService.getRepoFullCode("owner", "Probe", "token")
                 .as(StepVerifier::create)
-                .expectNextMatches(repoDto -> repoDto.name().equals("Probe"))
+                .expectNextMatches(repoDto -> repoDto.repoName().equals("Probe"))
                 .expectComplete()
                 .verify(java.time.Duration.ofSeconds(5)); // 5초 안에 안 끝나면 실패 처리
     }

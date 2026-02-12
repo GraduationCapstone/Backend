@@ -10,7 +10,7 @@ import lombok.*;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-@Table(uniqueConstraints = {@UniqueConstraint(name = "uk_user_repo", columnNames = {"user_id", "name"})})
+@Table(uniqueConstraints = {@UniqueConstraint(name = "uk_user_repo", columnNames = {"user_id", "repo_name"})})
 public class GithubRepo {
 
     @Id
@@ -18,7 +18,7 @@ public class GithubRepo {
     private Long id;
 
     @Column(name = "repo_name", nullable = false)
-    private String name;
+    private String repoName;
 
     @Column(name = "repo_owner", nullable = false)
     private String owner;
