@@ -1,7 +1,7 @@
 package com.graduationCapstone.Probe.domain.github.dto;
 
 public record GithubRepoSummaryDto(
-        String name,
+        String repoName,
         String owner,
         String description,
         String language,

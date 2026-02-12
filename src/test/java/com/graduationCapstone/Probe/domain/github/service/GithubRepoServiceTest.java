@@ -35,14 +35,14 @@ class GithubRepoServiceTest {
         User user = User.builder().id(1L).build();
         GithubRepoSummaryDto dto = new GithubRepoSummaryDto("NewRepo", "owner", "description", "Java", 0, 0, 0);
 
-        when(githubRepoRepository.findByUserIdAndName(1L, "NewRepo")).thenReturn(Optional.empty());
+        when(githubRepoRepository.findByUserIdAndRepoName(1L, "NewRepo")).thenReturn(Optional.empty());
 
         // save 호출 시 전달된 엔티티에 ID를 부여해서 반환하도록 설정
         when(githubRepoRepository.save(any(GithubRepo.class))).thenAnswer(invocation -> {
             GithubRepo savedRepo = invocation.getArgument(0);
             return GithubRepo.builder()
                     .id(200L) // 신규 생성된 ID 가정
-                    .name(savedRepo.getName())
+                    .repoName(savedRepo.getRepoName())
                     .user(user)
                     .build();
         });
@@ -51,7 +51,7 @@ class GithubRepoServiceTest {
         githubRepoService.upsertRepo(user, dto)
                 .as(StepVerifier::create)
                 .expectNextMatches(res -> {
-                    return res.id().equals(200L) && res.name().equals("NewRepo");
+                    return res.id().equals(200L) && res.repoName().equals("NewRepo");
                 })
                 .verifyComplete();
 
@@ -64,9 +64,9 @@ class GithubRepoServiceTest {
     void upsertRepoTest() {
         User user = User.builder().id(1L).build();
         GithubRepoSummaryDto dto = new GithubRepoSummaryDto("Probe", "owner", "desc", "Java", 1, 1, 1);
-        GithubRepo existing = GithubRepo.builder().id(100L).name("Probe").user(user).build();
+        GithubRepo existing = GithubRepo.builder().id(100L).repoName("Probe").user(user).build();
 
-        when(githubRepoRepository.findByUserIdAndName(1L, "Probe")).thenReturn(Optional.of(existing));
+        when(githubRepoRepository.findByUserIdAndRepoName(1L, "Probe")).thenReturn(Optional.of(existing));
         when(githubRepoRepository.save(any())).thenReturn(existing);
 
         githubRepoService.upsertRepo(user, dto)
