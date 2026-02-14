@@ -1,8 +1,12 @@
 package com.graduationCapstone.Probe.domain.user.entity;
 
+import com.graduationCapstone.Probe.domain.project.entity.ProjectMember;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Comment;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -35,6 +39,10 @@ public class User {
     @Comment("회원의 Github 접근을 위한 AccessToken")
     @Column(name = "github_access_token")
     private String githubAccessToken;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ProjectMember> projectMembers = new ArrayList<>();
 
     public void deleted(boolean deleted) {
         this.deleted = deleted;
