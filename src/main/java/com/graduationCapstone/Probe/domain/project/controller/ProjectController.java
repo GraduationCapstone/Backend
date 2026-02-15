@@ -1,10 +1,7 @@
 package com.graduationCapstone.Probe.domain.project.controller;
 
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoResponseDto;
-import com.graduationCapstone.Probe.domain.project.dto.ProjectCreateRequestDto;
-import com.graduationCapstone.Probe.domain.project.dto.ProjectInviteRequestDto;
-import com.graduationCapstone.Probe.domain.project.dto.ProjectNameUpdateRequestDto;
-import com.graduationCapstone.Probe.domain.project.dto.ProjectResponseDto;
+import com.graduationCapstone.Probe.domain.project.dto.*;
 import com.graduationCapstone.Probe.domain.project.service.ProjectService;
 import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
@@ -98,18 +95,55 @@ public class ProjectController {
                 .thenReturn(ResponseEntity.ok().build());
     }
 
-    @Operation(summary = "프로젝트 멤버 초대",
-               description = "여러 사용자를 프로젝트 멤버로 일괄 초대합니다.")
+    @Operation(summary = "이메일로 멤버 초대", description = "입력된 이메일로 초대 링크를 전송합니다. (Redis 토큰 방식)")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "초대 성공"),
+            @ApiResponse(responseCode = "200", description = "초대 메일 발송 성공"),
             @ApiResponse(responseCode = "404", description = "프로젝트 또는 사용자를 찾을 수 없음")
     })
-    @PostMapping("/{projectId}/members")
-    public Mono<ResponseEntity<Void>> inviteMember(
+    @PostMapping("/{projectId}/invite")
+    public Mono<ResponseEntity<Void>> inviteMembers(
             @PathVariable Long projectId,
-            @RequestBody ProjectInviteRequestDto request) {
-        return projectService.inviteMember(projectId, request.usernames())
+            @RequestBody ProjectInviteRequestDto requestDto) {
+        return projectService.inviteMembers(projectId, requestDto.emails())
                 .thenReturn(ResponseEntity.ok().build());
+    }
+
+    @Operation(summary = "초대 수락 (토큰 인증)", description = "이메일 링크를 통해 호출되며, 토큰을 검증하여 멤버로 등록합니다.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "초대 수락 성공(HTML페이지반환)"),
+            @ApiResponse(responseCode = "404", description = "유효하지 않거나 만료된 토큰"),
+            @ApiResponse(responseCode = "500", description = "서버 내부 오류")
+    })
+    @GetMapping("/accept")
+    public Mono<ResponseEntity<String>> acceptInvitation(@RequestParam String token) {
+        return projectService.acceptInvitationByToken(token)
+                .then(Mono.just(ResponseEntity.ok()
+                        .header("Content-Type", "text/html; charset=UTF-8") // 브라우저에게 HTML임을 알림
+                        .body("""
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="UTF-8">
+                            <title>초대 수락 완료</title>
+                            <style>
+                                body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8f9fa; margin: 0; }
+                                .container { text-align: center; background: white; padding: 50px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+                                h1 { color: #28a745; font-size: 2.5em; }
+                                p { color: #6c757d; font-size: 1.2em; }
+                                .btn { display: inline-block; margin-top: 20px; padding: 12px 25px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="container">
+                                <h1>✅ 초대 수락 완료!</h1>
+                                <p>이제 프로젝트의 멤버가 되었습니다.</p>
+                            </div>
+                        </body>
+                        </html>
+                        """)))
+                .onErrorResume(e -> Mono.just(ResponseEntity.badRequest()
+                        .header("Content-Type", "text/html; charset=UTF-8")
+                        .body("<h1>⚠️ 유효하지 않거나 만료된 토큰입니다.</h1>")));
     }
 
     @Operation(summary = "프로젝트 나가기 (스스로 나가기만 가능)",
@@ -142,6 +176,21 @@ public class ProjectController {
     @GetMapping("/{projectId}/repos")
     public Mono<ResponseEntity<List<GithubRepoResponseDto>>> getProjectRepos(@PathVariable Long projectId) {
         return projectService.getProjectRepoList(projectId)
+                .map(ResponseEntity::ok);
+    }
+
+    @Operation(summary = "서비스 사용자 검색", description = "닉네임 또는 이메일 키워드로 다른 사용자를 검색합니다. (초대 대상 탐색용)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "검색 결과 반환"),
+            @ApiResponse(responseCode = "401", description = "인증이 필요합니다.")
+    })
+    @GetMapping("/users/search")
+    public Mono<ResponseEntity<List<UserSearchResponseDto>>> searchUsers(
+            @RequestParam String keyword,
+            @AuthenticationPrincipal User user
+    ) {
+        return projectService.searchUsers(keyword, user)
+                .collectList()
                 .map(ResponseEntity::ok);
     }
 }

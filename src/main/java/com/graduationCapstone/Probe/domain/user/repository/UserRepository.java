@@ -10,5 +10,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByGithubIdAndDeletedFalse(String githubId);
     Optional<User> findByIdAndDeletedFalse(Long id);
     Optional<User> findByGithubId(String githubId);
-    List<User> findAllByUsernameIn(List<String> usernames);
+    Optional<User> findByEmail(String email);
+    boolean existsByEmail(String email);
+    List<User> findByUsernameContainingOrEmailContaining(String username, String email);
 }

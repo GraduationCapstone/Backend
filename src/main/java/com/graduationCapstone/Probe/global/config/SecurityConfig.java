@@ -65,7 +65,8 @@ public class SecurityConfig {
                                 "/login/**",
                                 "/api/auth/reissue",
                                 "/v3/api-docs/**",
-                                "/swagger-ui/**"
+                                "/swagger-ui/**",
+                                "/api/projects/accept"
                         ).permitAll()
                         .requestMatchers("/api/github/**").authenticated()
                         .anyRequest().authenticated()
