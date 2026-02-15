@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoResponseDto;
 import com.graduationCapstone.Probe.domain.github.entity.GithubRepo;
 import com.graduationCapstone.Probe.domain.github.repository.GithubRepoRepository;
-import com.graduationCapstone.Probe.domain.project.dto.InviteTokenInfo;
-import com.graduationCapstone.Probe.domain.project.dto.ProjectCreateRequestDto;
-import com.graduationCapstone.Probe.domain.project.dto.ProjectResponseDto;
-import com.graduationCapstone.Probe.domain.project.dto.UserSearchResponseDto;
+import com.graduationCapstone.Probe.domain.project.dto.*;
 import com.graduationCapstone.Probe.domain.project.entity.Project;
 import com.graduationCapstone.Probe.domain.project.entity.ProjectMember;
 import com.graduationCapstone.Probe.domain.project.entity.ProjectRepo;
@@ -280,6 +277,25 @@ public class ProjectService {
                 projectMemberRepository.save(newMember);
             }
         }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    /**
+     * 특정 프로젝트에 속한 모든 멤버 목록을 조회합니다.
+     *
+     * @param projectId 조회할 프로젝트 ID
+     * @return 멤버 정보 리스트를 담은 {@link Mono}
+     * @throws CustomException ErrorCode.PROJECT_NOT_FOUND - 프로젝트가 존재하지 않을 경우
+     */
+    public Mono<List<ProjectMemberResponseDto>> getProjectMembers(Long projectId) {
+        return Mono.fromCallable(() -> {
+            // 멤버 정보를 함께 페치 조인으로 가져오는 레포지토리 메서드 사용
+            Project project = projectRepository.findByIdWithMembers(projectId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+
+            return project.getMembers().stream()
+                    .map(ProjectMemberResponseDto::from)
+                    .toList();
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     /**

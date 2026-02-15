@@ -146,6 +146,17 @@ public class ProjectController {
                         .body("<h1>⚠️ 유효하지 않거나 만료된 토큰입니다.</h1>")));
     }
 
+    @Operation(summary = "프로젝트 멤버 목록 조회", description = "해당 프로젝트에 참여 중인 모든 멤버의 정보를 조회합니다.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "404", description = "프로젝트를 찾을 수 없음")
+    })
+    @GetMapping("/{projectId}/members")
+    public Mono<ResponseEntity<List<ProjectMemberResponseDto>>> getProjectMembers(@PathVariable Long projectId) {
+        return projectService.getProjectMembers(projectId)
+                .map(ResponseEntity::ok);
+    }
+
     @Operation(summary = "프로젝트 나가기 (스스로 나가기만 가능)",
                description = "스스로 프로젝트에서 탈퇴합니다. (타인 강퇴 불가)")
     @ApiResponses(value = {
