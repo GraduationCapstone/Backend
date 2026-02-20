@@ -113,6 +113,7 @@ public class GithubService {
      *
      * @param apiUrl   GitHub Blob API URL
      * @param fileName 파일 경로 및 이름
+     * @param token GitHub OAuth2 AccessToken
      * @return 파일 이름과 내용이 포함된 GithubFileDto를 담은 Mono
      */
     private Mono<GithubFileDto> fetchFileContent(String apiUrl, String fileName, String token) {
