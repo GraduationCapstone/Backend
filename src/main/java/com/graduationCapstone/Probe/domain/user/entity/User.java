@@ -3,6 +3,7 @@ package com.graduationCapstone.Probe.domain.user.entity;
 import com.graduationCapstone.Probe.domain.project.entity.ProjectMember;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Comment;
 
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@EqualsAndHashCode(of = "id")
 @Table(name = "users")
 public class User {
 
@@ -40,6 +42,7 @@ public class User {
     @Column(name = "github_access_token")
     private String githubAccessToken;
 
+    @BatchSize(size = 100)
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ProjectMember> projectMembers = new ArrayList<>();

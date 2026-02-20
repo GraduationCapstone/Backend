@@ -9,6 +9,7 @@ import lombok.*;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
+@EqualsAndHashCode(of = "id")
 @Table(name = "project_member", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"project_id", "user_id"})
 })
@@ -24,4 +25,16 @@ public class ProjectMember {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    public void setProject(Project project) {
+        if (this.project != null) {
+            this.project.getMembers().remove(this);
+        }
+
+        this.project = project;
+
+        if (project != null && !project.getMembers().contains(this)) {
+            project.getMembers().add(this);
+        }
+    }
 }
