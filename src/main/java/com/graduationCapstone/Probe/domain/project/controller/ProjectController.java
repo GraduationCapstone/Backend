@@ -10,10 +10,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -25,6 +28,7 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final SpringTemplateEngine templateEngine;
 
     @Operation(summary = "프로젝트 생성",
                description = "새로운 프로젝트를 생성하고, 생성자를 멤버로 추가합니다.")
@@ -36,7 +40,7 @@ public class ProjectController {
     @PostMapping
     public Mono<ResponseEntity<ProjectResponseDto>> createProject(
             @AuthenticationPrincipal User user,
-            @RequestBody ProjectCreateRequestDto request) {
+            @Valid @RequestBody ProjectCreateRequestDto request) {
         if (user == null) return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));
         return projectService.createProject(user, request).map(ResponseEntity::ok);
     }
@@ -64,7 +68,7 @@ public class ProjectController {
     @PatchMapping("/{projectId}/name")
     public Mono<ResponseEntity<Void>> updateProjectName(
             @PathVariable Long projectId,
-            @RequestBody ProjectNameUpdateRequestDto request) {
+            @Valid @RequestBody ProjectNameUpdateRequestDto request) {
         return projectService.updateProjectName(projectId, request.projectName())
                 .thenReturn(ResponseEntity.ok().build());
     }
@@ -90,8 +94,8 @@ public class ProjectController {
     @PutMapping("/{projectId}/repos")
     public Mono<ResponseEntity<Void>> updateProjectRepos(
             @PathVariable Long projectId,
-            @RequestBody List<Long> repoIds) {
-        return projectService.updateProjectRepos(projectId, repoIds)
+            @Valid @RequestBody ProjectRepoUpdateRequestDto request) {
+        return projectService.updateProjectRepos(projectId, request.repoIds())
                 .thenReturn(ResponseEntity.ok().build());
     }
 
@@ -103,7 +107,7 @@ public class ProjectController {
     @PostMapping("/{projectId}/invite")
     public Mono<ResponseEntity<Void>> inviteMembers(
             @PathVariable Long projectId,
-            @RequestBody ProjectInviteRequestDto requestDto) {
+            @Valid @RequestBody ProjectInviteRequestDto requestDto) {
         return projectService.inviteMembers(projectId, requestDto.emails())
                 .thenReturn(ResponseEntity.ok().build());
     }
@@ -117,33 +121,23 @@ public class ProjectController {
     @GetMapping("/accept")
     public Mono<ResponseEntity<String>> acceptInvitation(@RequestParam String token) {
         return projectService.acceptInvitationByToken(token)
-                .then(Mono.just(ResponseEntity.ok()
-                        .header("Content-Type", "text/html; charset=UTF-8") // 브라우저에게 HTML임을 알림
-                        .body("""
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <meta charset="UTF-8">
-                            <title>초대 수락 완료</title>
-                            <style>
-                                body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f8f9fa; margin: 0; }
-                                .container { text-align: center; background: white; padding: 50px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-                                h1 { color: #28a745; font-size: 2.5em; }
-                                p { color: #6c757d; font-size: 1.2em; }
-                                .btn { display: inline-block; margin-top: 20px; padding: 12px 25px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; }
-                            </style>
-                        </head>
-                        <body>
-                            <div class="container">
-                                <h1>✅ 초대 수락 완료!</h1>
-                                <p>이제 프로젝트의 멤버가 되었습니다.</p>
-                            </div>
-                        </body>
-                        </html>
-                        """)))
-                .onErrorResume(e -> Mono.just(ResponseEntity.badRequest()
-                        .header("Content-Type", "text/html; charset=UTF-8")
-                        .body("<h1>⚠️ 유효하지 않거나 만료된 토큰입니다.</h1>")));
+                .then(Mono.fromCallable(() -> {
+                    Context context = new Context();
+                    String htmlContent = templateEngine.process("project/accept-success", context);
+
+                    return ResponseEntity.ok()
+                            .header("Content-Type", "text/html; charset=UTF-8")
+                            .body(htmlContent);
+                }))
+                .onErrorResume(e -> Mono.fromCallable(() -> {
+                    Context context = new Context();
+                    context.setVariable("errorMessage", "유효하지 않거나 만료된 초대장입니다.");
+                    String htmlContent = templateEngine.process("project/accept-failure", context);
+
+                    return ResponseEntity.badRequest()
+                            .header("Content-Type", "text/html; charset=UTF-8")
+                            .body(htmlContent);
+                }));
     }
 
     @Operation(summary = "프로젝트 멤버 목록 조회", description = "해당 프로젝트에 참여 중인 모든 멤버의 정보를 조회합니다.")
