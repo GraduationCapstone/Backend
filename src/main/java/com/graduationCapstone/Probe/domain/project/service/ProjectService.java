@@ -10,6 +10,7 @@ import com.graduationCapstone.Probe.domain.project.entity.Project;
 import com.graduationCapstone.Probe.domain.project.entity.ProjectMember;
 import com.graduationCapstone.Probe.domain.project.entity.ProjectRepo;
 import com.graduationCapstone.Probe.domain.project.repository.ProjectMemberRepository;
+import com.graduationCapstone.Probe.domain.project.repository.ProjectRepoRepository;
 import com.graduationCapstone.Probe.domain.project.repository.ProjectRepository;
 import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.domain.user.repository.UserRepository;
@@ -27,6 +28,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -40,6 +42,7 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final GithubRepoRepository githubRepoRepository;
     private final UserRepository userRepository;
+    private final ProjectRepoRepository projectRepoRepository;
 
     private final ReactiveRedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
@@ -66,25 +69,28 @@ public class ProjectService {
             Project project = Project.builder()
                     .projectName(request.projectName())
                     .build();
-            projectRepository.save(project);
 
             ProjectMember member = ProjectMember.builder()
-                    .project(project)
                     .user(persistentUser)
                     .build();
-            projectMemberRepository.save(member);
+            project.addMember(member);
 
             if (request.repoIds() != null && !request.repoIds().isEmpty()) {
                 List<GithubRepo> repos = githubRepoRepository.findAllById(request.repoIds());
+
+                if (repos.size() != request.repoIds().size()) {
+                    throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
+                }
+
                 for (GithubRepo repo : repos) {
-                    project.getProjectRepos().add(ProjectRepo.builder()
-                            .project(project)
+                    ProjectRepo pr = ProjectRepo.builder()
                             .githubRepo(repo)
-                            .build());
+                            .build();
+                    project.addProjectRepo(pr);
                 }
             }
-            projectRepository.save(project);
-            return ProjectResponseDto.from(project);
+            Project savedProject = projectRepository.save(project);
+            return ProjectResponseDto.from(savedProject);
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -102,12 +108,23 @@ public class ProjectService {
     public Flux<ProjectResponseDto> getMyProjects(User user) {
         return Mono.fromCallable(() -> {
                     List<Project> projects = projectRepository.findAllByUserId(user.getId());
+                    if (projects.isEmpty()) return List.<ProjectResponseDto>of();
 
-                    return projects.stream()
-                            .map(ProjectResponseDto::from)
-                            .toList();
-                }).subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(Flux::fromIterable);
+                    List<Long> projectIds = projects.stream().map(Project::getId).toList();
+
+                    Map<Long, List<ProjectMember>> memberMap = projectMemberRepository.findAllByProjectIdIn(projectIds)
+                            .stream().collect(Collectors.groupingBy(m -> m.getProject().getId()));
+
+                    Map<Long, List<ProjectRepo>> repoMap = projectRepoRepository.findAllByProjectIdIn(projectIds)
+                            .stream().collect(Collectors.groupingBy(r -> r.getProject().getId()));
+
+                    return projects.stream().map(project -> {
+                        int memberCount = memberMap.getOrDefault(project.getId(), List.of()).size();
+                        int repoCount = repoMap.getOrDefault(project.getId(), List.of()).size();
+
+                        return ProjectResponseDto.of(project, memberCount, repoCount);
+                    }).toList();
+                }).subscribeOn(Schedulers.boundedElastic()).flatMapMany(Flux::fromIterable);
     }
 
     /**
@@ -157,10 +174,14 @@ public class ProjectService {
      */
     public Flux<UserSearchResponseDto> searchUsers(String keyword, User currentUser) {
         return Mono.fromCallable(() -> {
-                    List<User> users = userRepository.findByUsernameContainingOrEmailContaining(keyword, keyword);
+                    List<User> users = userRepository.findByUsernameContainingOrEmailContaining(keyword, keyword)
+                            .stream()
+                            .filter(user -> !user.getId().equals(currentUser.getId()))
+                            .toList();
+
+                    if (users.isEmpty()) return List.<UserSearchResponseDto>of();
 
                     return users.stream()
-                            .filter(user -> !user.getId().equals(currentUser.getId()))
                             .map(UserSearchResponseDto::from)
                             .toList();
                 }).subscribeOn(Schedulers.boundedElastic())
@@ -271,10 +292,10 @@ public class ProjectService {
 
             if (!isAlreadyMember) {
                 ProjectMember newMember = ProjectMember.builder()
-                        .project(project)
                         .user(user)
                         .build();
-                projectMemberRepository.save(newMember);
+                project.addMember(newMember);
+                projectRepository.save(project);
             }
         }).subscribeOn(Schedulers.boundedElastic()).then();
     }
@@ -288,7 +309,6 @@ public class ProjectService {
      */
     public Mono<List<ProjectMemberResponseDto>> getProjectMembers(Long projectId) {
         return Mono.fromCallable(() -> {
-            // 멤버 정보를 함께 페치 조인으로 가져오는 레포지토리 메서드 사용
             Project project = projectRepository.findByIdWithMembers(projectId)
                     .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
 
@@ -338,11 +358,16 @@ public class ProjectService {
 
             if (newRepoIds != null && !newRepoIds.isEmpty()) {
                 List<GithubRepo> repos = githubRepoRepository.findAllById(newRepoIds);
+
+                if (repos.size() != newRepoIds.size()) {
+                    throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
+                }
+
                 for (GithubRepo repo : repos) {
-                    project.getProjectRepos().add(ProjectRepo.builder()
-                            .project(project)
+                    ProjectRepo pr = ProjectRepo.builder()
                             .githubRepo(repo)
-                            .build());
+                            .build();
+                    project.addProjectRepo(pr);
                 }
             }
             projectRepository.save(project);
