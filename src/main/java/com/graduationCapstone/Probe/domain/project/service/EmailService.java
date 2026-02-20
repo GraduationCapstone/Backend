@@ -3,17 +3,30 @@ package com.graduationCapstone.Probe.domain.project.service;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final SpringTemplateEngine templateEngine;
 
+    /**
+     * 비동기로 프로젝트 초대 이메일을 발송합니다.
+     * @Async("mailExecutor")를 통해 별도의 스레드에서 실행됩니다.
+     */
+    @Async("mailExecutor")
     public void sendInvitationEmail(String toEmail, String inviteLink, String projectName) {
+        log.info("이메일 발송 시작 : to={}, project={}", toEmail, projectName);
+
         MimeMessage message = mailSender.createMimeMessage();
 
         try {
@@ -22,39 +35,20 @@ public class EmailService {
 
             helper.setSubject(String.format("[Probe] '%s' 프로젝트 초대장이 도착했습니다!", projectName));
 
-            String htmlContent = getInvitationHtml(inviteLink, projectName);
+            Context context = new Context();
+            context.setVariable("serviceName", "Probe");
+            context.setVariable("projectName", projectName);
+            context.setVariable("inviteLink", inviteLink);
+
+            String htmlContent = templateEngine.process("mail/invitation", context);
 
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
+            log.info("이메일 발송 성공: to={}", toEmail);
 
         } catch (MessagingException e) {
-            throw new RuntimeException("이메일 발송 실패", e);
+            log.error("이메일 발송 중 오류 발생: to={}, error={}", toEmail, e.getMessage());
         }
-    }
-
-    private String getInvitationHtml(String inviteLink, String projectName) {
-        return """
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-            <h2 style="color: #333;">프로젝트 초대장</h2>
-            <p style="font-size: 16px; color: #555;">
-                안녕하세요! <strong>Probe</strong> 서비스입니다.<br>
-                아래 프로젝트로부터 초대장이 도착했습니다.
-            </p>
-            <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #4CAF50; margin: 20px 0;">
-                <span style="font-size: 18px; font-weight: bold; color: #2e7d32;">
-                    📂 프로젝트명: %s
-                </span>
-            </div>
-            <p style="font-size: 14px; color: #777; margin-bottom: 30px;">
-                팀원들과 함께 협업을 시작하려면 아래 '초대 수락하기' 버튼을 클릭해 주세요.
-            </p>
-            <div style="text-align: center;">
-                <a href="%s" style="background-color: #4CAF50; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-                    초대 수락하기
-                </a>
-            </div>
-        </div>
-        """.formatted(projectName, inviteLink);
     }
 }
