@@ -33,7 +33,7 @@ public class ProjectMember {
 
         this.project = project;
 
-        if (project != null && !project.getMembers().contains(this)) {
+        if (project != null) {
             project.getMembers().add(this);
         }
     }

@@ -33,7 +33,7 @@ public class ProjectRepo {
 
         this.project = project;
 
-        if (project != null && !project.getProjectRepos().contains(this)) {
+        if (project != null) {
             project.getProjectRepos().add(this);
         }
     }
