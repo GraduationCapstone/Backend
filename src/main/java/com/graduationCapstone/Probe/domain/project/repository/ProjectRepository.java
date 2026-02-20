@@ -11,21 +11,19 @@ import java.util.Optional;
 public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     @Query("SELECT DISTINCT p FROM Project p " +
-            "LEFT JOIN FETCH p.projectRepos pr " +
-            "LEFT JOIN FETCH pr.githubRepo " +
-            "LEFT JOIN FETCH p.members m " +
+            "JOIN p.members m " +
             "WHERE m.user.id = :userId")
     List<Project> findAllByUserId(@Param("userId") Long userId);
 
     @Query("SELECT DISTINCT p FROM Project p " +
             "LEFT JOIN FETCH p.projectRepos pr " +
             "LEFT JOIN FETCH pr.githubRepo " +
-            "LEFT JOIN FETCH p.members " +
             "WHERE p.id = :id")
     Optional<Project> findByIdWithRepos(@Param("id") Long id);
 
     @Query("SELECT DISTINCT p FROM Project p " +
-            "LEFT JOIN FETCH p.members " +
+            "LEFT JOIN FETCH p.members m " +
+            "LEFT JOIN FETCH m.user " +
             "WHERE p.id = :id")
     Optional<Project> findByIdWithMembers(@Param("id") Long id);
 }
