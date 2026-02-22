@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /> <title>프로젝트 초대장</title>
+</head>
+<body>
+<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+    <h2 style="color: #333;">프로젝트 초대장</h2>
+    <p style="font-size: 16px; color: #555;">
+        안녕하세요! <strong th:text="${serviceName}">Probe</strong> 서비스입니다.<br>
+        아래 프로젝트로부터 초대장이 도착했습니다.
+    </p>
+    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #4CAF50; margin: 20px 0;">
+        <span style="font-size: 18px; font-weight: bold; color: #2e7d32;"
+              th:text="|📂 프로젝트명: ${projectName}|">
+            📂 프로젝트명: 프로젝트이름
+        </span>
+    </div>
+    <p style="font-size: 14px; color: #777; margin-bottom: 30px;">
+        팀원들과 함께 협업을 시작하려면 아래 '초대 수락하기' 버튼을 클릭해 주세요.
+    </p>
+    <div style="text-align: center;">
+        <a th:href="${inviteLink}"
+           style="background-color: #4CAF50; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+            초대 수락하기
+        </a>
+    </div>
+</div>
+</body>
+</html>

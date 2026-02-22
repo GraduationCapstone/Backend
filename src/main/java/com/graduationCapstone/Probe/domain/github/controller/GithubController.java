@@ -35,13 +35,6 @@ public class GithubController {
     private final GithubRepoService githubRepoService;
     private final UserRepository userRepository;
 
-    /**
-     * 인증된 사용자의 GitHub 레포지토리 목록을 조회합니다.
-     * 비동기 스트림 내에서 사용자의 최신 액세스 토큰을 확인하여 GitHub API로부터 레포지토리 요약 정보를 가져옵니다.
-     *
-     * @param user 인증된 사용자 정보 (@AuthenticationPrincipal)
-     * @return 사용자의 레포지토리 요약 정보 리스트를 포함한 Mono (200 OK)
-     */
     @Operation(
             summary = "레포지토리 목록 조회",
             description = "로그인된 사용자의 모든 GitHub 레포지토리 목록을 가져옵니다. 사용자가 테스트할 레포지토리를 선택할 수 있도록 요약된 정보를 반환합니다.")
@@ -70,13 +63,6 @@ public class GithubController {
         });
     }
 
-    /**
-     * 선택한 레포지토리의 정보를 DB에 저장하거나, 이미 존재할 경우 최신 정보로 업데이트합니다.
-     *
-     * @param user 인증된 사용자 정보 (@AuthenticationPrincipal)
-     * @param summaryDto 저장하고자 하는 레포지토리 정보 (선택된 항목)
-     * @return DB에 저장된 레포지토리 상세 정보를 포함한 Mono
-     */
     @Operation(
             summary = "선택된 레포지토리 저장/업데이트",
             description = "사용자가 선택한 레포지토리 정보를 내부 DB에 저장하거나, 기존에 같은 이름의 레포지토리가 있는 경우 최신 정보로 업데이트합니다.")
@@ -98,12 +84,6 @@ public class GithubController {
                 .map(ResponseEntity::ok);
     }
 
-    /**
-     * DB에 저장된 사용자의 레포지토리 목록을 조회합니다.
-     *
-     * @param user 인증된 사용자 정보 (@AuthenticationPrincipal)
-     * @return DB에 저장된 레포지토리 리스트를 포함한 Mono
-     */
     @Operation(
             summary = "저장된 레포지토리 목록 조회",
             description = "DB에 저장된 레포지토리 목록을 가져옵니다.")
@@ -122,13 +102,6 @@ public class GithubController {
                 .map(ResponseEntity::ok);
     }
 
-    /**
-     * DB에 저장된 특정 레포지토리 정보를 삭제합니다.
-     *
-     * @param user 인증된 사용자 정보 (@AuthenticationPrincipal)
-     * @param repoId 삭제할 레포지토리의 DB 고유 ID
-     * @return 처리 결과 (No Content)
-     */
     @Operation(
             summary = "저장된 레포지토리 삭제",
             description = "DB에서 관리 중인 특정 레포지토리 정보를 삭제합니다.")
@@ -150,14 +123,6 @@ public class GithubController {
                 .then(Mono.just(ResponseEntity.noContent().build()));
     }
 
-    /**
-     * 사용자가 선택한 특정 레포지토리의 모든 소스 코드를 추출합니다.
-     * 해당 레포지토리의 전체 디렉토리를 재귀적으로 탐색하며, 각 파일의 원문 코드를 추출하여 반환합니다.
-     *
-     * @param user     인증된 사용자 정보 (@AuthenticationPrincipal)
-     * @param repoName 추출 대상 레포지토리 이름
-     * @return 선택된 레포지토리 정보와 파일 리스트를 포함한 Mono (200 OK)
-     */
     @Operation(
             summary = "선택된 레포지토리 전체 코드 추출",
             description = "사용자가 선택한 특정 레포지토리의 모든 소스 코드와 파일 내용을 재귀적으로 탐색하여 가져옵니다.")

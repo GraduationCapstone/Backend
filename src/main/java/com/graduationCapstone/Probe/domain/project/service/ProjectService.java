@@ -1,0 +1,394 @@
+package com.graduationCapstone.Probe.domain.project.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.graduationCapstone.Probe.domain.github.dto.GithubRepoResponseDto;
+import com.graduationCapstone.Probe.domain.github.entity.GithubRepo;
+import com.graduationCapstone.Probe.domain.github.repository.GithubRepoRepository;
+import com.graduationCapstone.Probe.domain.project.dto.*;
+import com.graduationCapstone.Probe.domain.project.entity.Project;
+import com.graduationCapstone.Probe.domain.project.entity.ProjectMember;
+import com.graduationCapstone.Probe.domain.project.entity.ProjectRepo;
+import com.graduationCapstone.Probe.domain.project.repository.ProjectMemberRepository;
+import com.graduationCapstone.Probe.domain.project.repository.ProjectRepoRepository;
+import com.graduationCapstone.Probe.domain.project.repository.ProjectRepository;
+import com.graduationCapstone.Probe.domain.user.entity.User;
+import com.graduationCapstone.Probe.domain.user.repository.UserRepository;
+import com.graduationCapstone.Probe.global.exception.ErrorCode;
+import com.graduationCapstone.Probe.global.exception.handler.CustomException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.ReactiveRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ProjectService {
+
+    private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
+    private final GithubRepoRepository githubRepoRepository;
+    private final UserRepository userRepository;
+    private final ProjectRepoRepository projectRepoRepository;
+
+    private final ReactiveRedisTemplate<String, String> redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final EmailService emailService;
+
+    @Value("${app.server.url}")
+    private String serverUrl;
+
+    /**
+     * 새로운 프로젝트를 생성합니다.
+     * 프로젝트 생성 시 생성자를 프로젝트 멤버로 등록합니다.
+     *
+     * @param user    프로젝트를 생성하는 주체 (현재 로그인한 유저)
+     * @param request 프로젝트 이름과 초기 레포지토리 ID 목록을 담은 DTO
+     * @return 생성된 프로젝트의 상세 정보 (DTO)
+     * @throws CustomException USER_NOT_FOUND (유저 정보가 없을 경우)
+     */
+    @Transactional
+    public Mono<ProjectResponseDto> createProject(User user, ProjectCreateRequestDto request) {
+        return Mono.fromCallable(() -> {
+            User persistentUser = userRepository.findById(user.getId())
+                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+            Project project = Project.builder()
+                    .projectName(request.projectName())
+                    .build();
+
+            ProjectMember member = ProjectMember.builder()
+                    .user(persistentUser)
+                    .build();
+            project.addMember(member);
+
+            if (request.repoIds() != null && !request.repoIds().isEmpty()) {
+                List<GithubRepo> repos = githubRepoRepository.findAllById(request.repoIds());
+
+                if (repos.size() != request.repoIds().size()) {
+                    throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
+                }
+
+                for (GithubRepo repo : repos) {
+                    ProjectRepo pr = ProjectRepo.builder()
+                            .githubRepo(repo)
+                            .build();
+                    project.addProjectRepo(pr);
+                }
+            }
+            Project savedProject = projectRepository.save(project);
+            return ProjectResponseDto.from(savedProject);
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * 내가 속한 모든 프로젝트 목록을 조회합니다.
+     * <p>
+     * `findAllByUserId`(Fetch Join 적용)를 사용하여,
+     * 프로젝트와 연관된 멤버 및 레포지토리 정보를 한 번에 가져옵니다.
+     * (N+1 문제 및 LazyInitializationException 방지)
+     * </p>
+     *
+     * @param user 조회를 요청한 사용자
+     * @return 프로젝트 목록
+     */
+    public Flux<ProjectResponseDto> getMyProjects(User user) {
+        return Mono.fromCallable(() -> {
+                    List<Project> projects = projectRepository.findAllByUserId(user.getId());
+                    if (projects.isEmpty()) return List.<ProjectResponseDto>of();
+
+                    List<Long> projectIds = projects.stream().map(Project::getId).toList();
+
+                    Map<Long, List<ProjectMember>> memberMap = projectMemberRepository.findAllByProjectIdIn(projectIds)
+                            .stream().collect(Collectors.groupingBy(m -> m.getProject().getId()));
+
+                    Map<Long, List<ProjectRepo>> repoMap = projectRepoRepository.findAllByProjectIdIn(projectIds)
+                            .stream().collect(Collectors.groupingBy(r -> r.getProject().getId()));
+
+                    return projects.stream().map(project -> {
+                        int memberCount = memberMap.getOrDefault(project.getId(), List.of()).size();
+                        int repoCount = repoMap.getOrDefault(project.getId(), List.of()).size();
+
+                        return ProjectResponseDto.of(project, memberCount, repoCount);
+                    }).toList();
+                }).subscribeOn(Schedulers.boundedElastic()).flatMapMany(Flux::fromIterable);
+    }
+
+    /**
+     * 프로젝트의 이름을 변경합니다.
+     *
+     * @param projectId      대상 프로젝트 ID
+     * @param newProjectName 변경할 새로운 이름
+     * @return Void
+     * @throws CustomException PROJECT_NOT_FOUND (프로젝트가 없을 경우)
+     */
+    @Transactional
+    public Mono<Void> updateProjectName(Long projectId, String newProjectName) {
+        return Mono.fromRunnable(() -> {
+            Project project = projectRepository.findById(projectId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+            project.updateProjectName(newProjectName);
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    /**
+     * 프로젝트를 삭제합니다.
+     * <p>
+     * Cascade 설정에 의해 프로젝트가 삭제되면, 소속 멤버 및 레포지토리 연결 정보도 함께 삭제됩니다.
+     * </p>
+     *
+     * @param projectId 삭제할 프로젝트 ID
+     * @return Void
+     * @throws CustomException PROJECT_NOT_FOUND (프로젝트가 없을 경우)
+     */
+    @Transactional
+    public Mono<Void> deleteProject(Long projectId) {
+        return Mono.fromRunnable(() -> {
+            if (!projectRepository.existsById(projectId)) {
+                throw new CustomException(ErrorCode.PROJECT_NOT_FOUND);
+            }
+            projectRepository.deleteById(projectId);
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    /**
+     * 키워드(사용자명 또는 이메일)를 통해 사용자를 검색합니다.
+     * 현재 로그인한 사용자는 검색 결과에서 제외됩니다.
+     *
+     * @param keyword     검색할 키워드 (이메일 혹은 아이디의 일부)
+     * @param currentUser 현재 검색을 수행 중인 사용자 (결과 제외 대상)
+     * @return 검색된 사용자 정보를 담은 리스트
+     */
+    public Flux<UserSearchResponseDto> searchUsers(String keyword, User currentUser) {
+        return Mono.fromCallable(() -> {
+                    List<User> users = userRepository.findByUsernameContainingOrEmailContaining(keyword, keyword)
+                            .stream()
+                            .filter(user -> !user.getId().equals(currentUser.getId()))
+                            .toList();
+
+                    if (users.isEmpty()) return List.<UserSearchResponseDto>of();
+
+                    return users.stream()
+                            .map(UserSearchResponseDto::from)
+                            .toList();
+                }).subscribeOn(Schedulers.boundedElastic())
+                .flatMapMany(Flux::fromIterable);
+    }
+
+    /**
+     * 선택한 사용자들의 이메일 주소로 프로젝트 초대 링크를 일괄 발송합니다.
+     *
+     * @param projectId 초대할 대상 프로젝트의 고유 ID
+     * @param emails    초대장을 보낼 이메일 주소 리스트
+     * @return 비동기 처리가 완료됨을 나타내는 {@link Mono}
+     * @throws CustomException ErrorCode.PROJECT_NOT_FOUND - 프로젝트가 존재하지 않을 경우 발생
+     */
+    @Transactional
+    public Mono<Void> inviteMembers(Long projectId, List<String> emails) {
+        return Mono.fromCallable(() -> projectRepository.findById(projectId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND)))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(project -> {
+                    String projectName = project.getProjectName();
+
+                    return Flux.fromIterable(emails)
+                            .flatMap(email -> sendInviteToSingleUser(projectId, email, projectName)
+                                    .onErrorResume(e -> Mono.empty()))
+                            .then();
+                });
+    }
+
+    /**
+     * 단일 유저에게 초대 토큰을 생성하고 메일을 발송합니다. (내부 로직)
+     * 토큰 정보는 Redis에 24시간 동안 저장됩니다.
+     *
+     * @param projectId   초대할 프로젝트 ID
+     * @param email       대상 이메일 주소
+     * @param projectName 이메일 본문에 표시될 프로젝트 이름
+     * @return 비동기 처리가 완료됨을 나타내는 {@link Mono}
+     */
+    private Mono<Void> sendInviteToSingleUser(Long projectId, String email, String projectName) {
+        return Mono.fromRunnable(() -> {
+            if (!userRepository.existsByEmail(email)) return;
+
+            String token = UUID.randomUUID().toString();
+            String redisKey = "invite:" + token;
+            InviteTokenInfo info = new InviteTokenInfo(projectId, email);
+
+            try {
+                String jsonValue = objectMapper.writeValueAsString(info);
+                redisTemplate.opsForValue()
+                        .set(redisKey, jsonValue, Duration.ofHours(24))
+                        .subscribe();
+
+                String link = serverUrl + "/api/projects/accept?token=" + token;
+
+                emailService.sendInvitationEmail(email, link, projectName);
+
+            } catch (JsonProcessingException e) {
+                throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+            }
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    /**
+     * 이메일 링크를 통해 전달된 토큰을 검증하고 사용자를 프로젝트 멤버로 등록합니다.
+     * 검증 성공 시 사용된 토큰은 Redis에서 즉시 삭제됩니다.
+     *
+     * @param token 이메일에 포함된 초대 인증 토큰
+     * @return 비동기 처리가 완료됨을 나타내는 {@link Mono}
+     * @throws CustomException ErrorCode.INVITATION_NOT_FOUND - 토큰이 만료되었거나 존재하지 않을 경우
+     * @throws CustomException ErrorCode.INTERNAL_SERVER_ERROR - 데이터 파싱 중 오류 발생 시
+     */
+    @Transactional
+    public Mono<Void> acceptInvitationByToken(String token) {
+        String redisKey = "invite:" + token;
+        return redisTemplate.opsForValue().get(redisKey)
+                .switchIfEmpty(Mono.defer(() -> Mono.error(new CustomException(ErrorCode.INVITATION_NOT_FOUND))))
+                .flatMap(jsonValue -> {
+                    try {
+                        InviteTokenInfo info = objectMapper.readValue(jsonValue, InviteTokenInfo.class);
+                        return saveMemberToDb(info.projectId(), info.inviteEmail());
+                    } catch (JsonProcessingException e) {
+                        log.error("초대 토큰 파싱 중 오류 발생: {}", e.getMessage(), e);
+                        return Mono.error(new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
+                    }
+                })
+                .then(redisTemplate.opsForValue().delete(redisKey))
+                .then();
+    }
+
+    /**
+     * 사용자 정보를 확인한 후 DB에 프로젝트 멤버로 저장합니다. (내부 로직)
+     * 이미 멤버인 경우 중복 저장을 방지합니다.
+     *
+     * @param projectId 프로젝트 고유 ID
+     * @param email     멤버로 등록할 사용자의 이메일
+     * @return 비동기 처리가 완료됨을 나타내는 {@link Mono}
+     */
+    private Mono<Void> saveMemberToDb(Long projectId, String email) {
+        return Mono.fromRunnable(() -> {
+            Project project = projectRepository.findByIdWithMembers(projectId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+            boolean isAlreadyMember = project.getMembers().stream()
+                    .anyMatch(m -> m.getUser().getId().equals(user.getId()));
+
+            if (!isAlreadyMember) {
+                ProjectMember newMember = ProjectMember.builder()
+                        .user(user)
+                        .build();
+                project.addMember(newMember);
+                projectRepository.save(project);
+            }
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    /**
+     * 특정 프로젝트에 속한 모든 멤버 목록을 조회합니다.
+     *
+     * @param projectId 조회할 프로젝트 ID
+     * @return 멤버 정보 리스트를 담은 {@link Mono}
+     * @throws CustomException ErrorCode.PROJECT_NOT_FOUND - 프로젝트가 존재하지 않을 경우
+     */
+    public Mono<List<ProjectMemberResponseDto>> getProjectMembers(Long projectId) {
+        return Mono.fromCallable(() -> {
+            Project project = projectRepository.findByIdWithMembers(projectId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+
+            return project.getMembers().stream()
+                    .map(ProjectMemberResponseDto::from)
+                    .toList();
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    /**
+     * 프로젝트에서 특정 멤버를 삭제합니다.
+     * <p>
+     * 현재 정책상 회원이 <b>스스로 프로젝트를 탈퇴할 때</b> 사용됩니다.
+     * (Controller 계층에서 본인 확인 후 호출됨)
+     * </p>
+     *
+     * @param projectId 대상 프로젝트 ID
+     * @param userId    삭제할 멤버(본인)의 고유 ID (PK)
+     * @return Void
+     * @throws CustomException USER_NOT_FOUND (해당 멤버가 프로젝트에 없는 경우)
+     */
+    @Transactional
+    public Mono<Void> removeMember(Long projectId, Long userId) {
+        return Mono.fromRunnable(() -> {
+            ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+            projectMemberRepository.delete(member);
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    /**
+     * 프로젝트에 연결된 레포지토리 목록을 수정합니다.
+     * 기존 연결을 모두 해제(Clear)하고, 요청된 새 레포지토리 목록으로 교체합니다.
+     *
+     * @param projectId  대상 프로젝트 ID
+     * @param newRepoIds 새로 설정할 레포지토리 ID 목록
+     * @return Void
+     * @throws CustomException PROJECT_NOT_FOUND
+     */
+    @Transactional
+    public Mono<Void> updateProjectRepos(Long projectId, List<Long> newRepoIds) {
+        return Mono.fromRunnable(() -> {
+            Project project = projectRepository.findByIdWithRepos(projectId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+
+            project.getProjectRepos().clear();
+
+            if (newRepoIds != null && !newRepoIds.isEmpty()) {
+                List<GithubRepo> repos = githubRepoRepository.findAllById(newRepoIds);
+
+                if (repos.size() != newRepoIds.size()) {
+                    throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
+                }
+
+                for (GithubRepo repo : repos) {
+                    ProjectRepo pr = ProjectRepo.builder()
+                            .githubRepo(repo)
+                            .build();
+                    project.addProjectRepo(pr);
+                }
+            }
+            projectRepository.save(project);
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    /**
+     * 프로젝트에 연결된 GitHub 레포지토리 목록을 조회합니다.
+     *
+     * @param projectId 대상 프로젝트 ID
+     * @return 연결된 레포지토리 정보 리스트
+     */
+    public Mono<List<GithubRepoResponseDto>> getProjectRepoList(Long projectId) {
+        return Mono.fromCallable(() -> {
+            Project project = projectRepository.findByIdWithRepos(projectId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+
+            return project.getProjectRepos().stream()
+                    .map(ProjectRepo::getGithubRepo)
+                    .map(GithubRepoResponseDto::from)
+                    .collect(Collectors.toList());
+        }).subscribeOn(Schedulers.boundedElastic());
+    }
+}

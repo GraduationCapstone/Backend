@@ -25,6 +25,24 @@ spring:
               - read:user
               - user:email
               - repo
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          timeout: 5000
+          connectiontimeout: 5000
+          writetimeout: 5000
 
 jwt:
   secret: ${JWT_SECRET}
@@ -36,3 +54,7 @@ oauth2:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+app:
+  server:
+    url: ${SERVER_URL}

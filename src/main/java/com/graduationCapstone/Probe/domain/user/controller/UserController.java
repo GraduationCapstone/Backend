@@ -25,13 +25,6 @@ public class UserController {
 
     private final UserService userService;
 
-    /**
-     * 현재 인증된 사용자의 상세 정보를 조회합니다.
-     * Security Context의 Authentication 객체에 저장된 사용자 엔티티 정보를 반환합니다.
-     *
-     * @param user 현재 세션의 인증된 사용자 객체 (@AuthenticationPrincipal)
-     * @return 사용자 엔티티 정보 (200 OK)
-     */
     @Operation(summary = "내 정보 조회", description = "유효한 Access Token으로 현재 로그인된 사용자(User)의 상세 정보를 조회합니다.")
     @ApiResponses({
             @ApiResponse(
@@ -50,13 +43,6 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
-    /**
-     * 현재 로그인된 사용자의 계정을 탈퇴(논리적 삭제) 처리합니다.
-     * 데이터베이스에서 데이터를 물리적으로 삭제하지 않고, 삭제 플래그를 처리하거나 RefreshToken을 무효화하는 서비스 로직을 수행합니다.
-     *
-     * @param user 현재 세션의 인증된 사용자 객체
-     * @return 처리 완료 후 본문 없는 응답 (204 No Content)
-     */
     @Operation(summary = "회원 탈퇴 (논리적 삭제)", description = "로그인된 사용자 계정을 논리적으로 삭제하고 Refresh Token을 무효화합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "성공적으로 탈퇴 처리됨 (No Content)"),
