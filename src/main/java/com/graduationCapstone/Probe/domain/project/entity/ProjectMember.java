@@ -37,4 +37,16 @@ public class ProjectMember {
             project.getMembers().add(this);
         }
     }
+
+    public void setUser(User user) {
+        if (this.user == user) {
+            return;
+        }
+
+        this.user = user;
+
+        if (user != null) {
+            user.addProjectMember(this);
+        }
+    }
 }

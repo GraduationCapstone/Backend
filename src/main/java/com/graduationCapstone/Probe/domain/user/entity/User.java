@@ -47,6 +47,13 @@ public class User {
     @Builder.Default
     private List<ProjectMember> projectMembers = new ArrayList<>();
 
+    public void addProjectMember(ProjectMember projectMember) {
+        this.projectMembers.add(projectMember);
+        if (projectMember.getUser() != this) {
+            projectMember.setUser(this);
+        }
+    }
+
     public void deleted(boolean deleted) {
         this.deleted = deleted;
     }
