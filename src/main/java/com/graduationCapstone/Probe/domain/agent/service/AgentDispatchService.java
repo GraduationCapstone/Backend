@@ -9,7 +9,6 @@ import com.graduationCapstone.Probe.domain.test.repository.TestExecutionReposito
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import com.graduationCapstone.Probe.global.exception.handler.CustomException;
 import com.graduationCapstone.Probe.infrastructure.ai.dto.AiTestRequest;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
