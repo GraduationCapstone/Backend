@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Tag(
         name = "AI 에이전트 (Agent)",
-        description = "GitHub Actions 기반의 AI 테스트 에이전트 제어"
+        description = "AI 테스트 에이전트 제어 및 결과 수신"
 )
 @RestController
 @RequestMapping("/api/agent")
@@ -27,7 +27,7 @@ public class AgentController {
 
     @Operation(
             summary = "테스트 실행 트리거 (Dispatch)",
-            description = "GitHub Actions Runner에게 테스트 시작 명령을 비동기로 전송합니다."
+            description = "FastAPI AI 서버에게 테스트 시작 명령을 비동기로 전송합니다."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "202", description = "명령 전송 요청 접수됨 (비동기 처리 시작)"),
