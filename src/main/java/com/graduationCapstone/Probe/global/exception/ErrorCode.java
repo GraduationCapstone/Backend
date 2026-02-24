@@ -41,6 +41,10 @@ public enum ErrorCode {
     // 500 INTERNAL SERVER ERROR (서버 내부 오류)
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "SERVER50001", "서버 내부 오류가 발생했습니다."),
 
+    // 502 BAD GATEWAY / 504 GATEWAY TIMEOUT (AI 서버 통신 오류)
+    AI_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "AI50201", "AI 서버 호출에 실패했습니다."),
+    AI_SERVER_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI50401", "AI 서버 응답 시간이 초과되었습니다."),
+
     ;
 
     private final HttpStatus httpStatus;
