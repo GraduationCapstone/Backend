@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 public class AiServerConfig {
 
-    @Value("${ai-server.url}")
+    @Value("${ai-server.url:http://localhost:8000}")
     private String aiServerUrl;
 
     @Value("${ai-server.api-key:}")

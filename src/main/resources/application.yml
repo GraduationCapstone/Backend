@@ -59,7 +59,7 @@ app:
   server:
     url: ${SERVER_URL}
 
-# AI 서버 스팩 나오면 수정
+# AI 서버 스펙 나오면 수정
 # ai-server:
   # url: ${AI_SERVER_URL}
   # api-key: ${AI_SERVER_API_KEY:}
