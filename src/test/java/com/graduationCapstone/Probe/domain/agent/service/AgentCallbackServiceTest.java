@@ -1,6 +1,8 @@
 package com.graduationCapstone.Probe.domain.agent.service;
 
 import com.graduationCapstone.Probe.domain.agent.dto.AgentCallbackRequestDto;
+import com.graduationCapstone.Probe.domain.test.entity.ExecutionStatus;
+import com.graduationCapstone.Probe.domain.test.entity.ResultStatus;
 import com.graduationCapstone.Probe.domain.test.entity.TestExecution;
 import com.graduationCapstone.Probe.domain.test.entity.TestResult;
 import com.graduationCapstone.Probe.domain.test.repository.TestExecutionRepository;
@@ -50,21 +52,21 @@ class AgentCallbackServiceTest {
                 .executionId(executionId)
                 .projectId(100L)
                 .memberId(1L)
-                .status("RUNNING")
+                .status(ExecutionStatus.RUNNING)
                 .build();
         given(testExecutionRepository.findById(executionId)).willReturn(Optional.of(execution));
 
         AgentCallbackRequestDto dto = new AgentCallbackRequestDto(
                 executionId,
-                "COMPLETED",
+                ExecutionStatus.COMPLETED,
                 3500L,
                 "https://s3.amazonaws.com/bucket/report.zip",
                 List.of(
                         new AgentCallbackRequestDto.TestResultDto(
-                                "로그인 성공 케이스", "SUCCESS", null, "https://s3.amazonaws.com/bucket/sc1.png"
+                                "로그인 성공 케이스", ResultStatus.SUCCESS, null, "https://s3.amazonaws.com/bucket/sc1.png"
                         ),
                         new AgentCallbackRequestDto.TestResultDto(
-                                "잘못된 비밀번호 케이스", "FAIL", "AssertionError: 예상 오류 메시지와 다름", null
+                                "잘못된 비밀번호 케이스", ResultStatus.FAIL, "AssertionError: 예상 오류 메시지와 다름", null
                         )
                 )
         );
@@ -73,7 +75,7 @@ class AgentCallbackServiceTest {
         agentCallbackService.handleCallback(dto);
 
         // then — TestExecution 상태/완료 정보 업데이트 확인
-        assertThat(execution.getStatus()).isEqualTo("COMPLETED");
+        assertThat(execution.getStatus()).isEqualTo(ExecutionStatus.COMPLETED);
         assertThat(execution.getDurationMs()).isEqualTo(3500L);
         assertThat(execution.getReportS3Url()).isEqualTo("https://s3.amazonaws.com/bucket/report.zip");
         assertThat(execution.getCompletedAt()).isNotNull();
@@ -87,9 +89,9 @@ class AgentCallbackServiceTest {
         List<TestResult> savedResults = captor.getValue();
         assertThat(savedResults).hasSize(2);
         assertThat(savedResults.get(0).getCaseName()).isEqualTo("로그인 성공 케이스");
-        assertThat(savedResults.get(0).getStatus()).isEqualTo("SUCCESS");
+        assertThat(savedResults.get(0).getStatus()).isEqualTo(ResultStatus.SUCCESS);
         assertThat(savedResults.get(1).getCaseName()).isEqualTo("잘못된 비밀번호 케이스");
-        assertThat(savedResults.get(1).getStatus()).isEqualTo("FAIL");
+        assertThat(savedResults.get(1).getStatus()).isEqualTo(ResultStatus.FAIL);
         assertThat(savedResults.get(1).getErrorLog()).isEqualTo("AssertionError: 예상 오류 메시지와 다름");
     }
 
@@ -106,13 +108,13 @@ class AgentCallbackServiceTest {
                 .executionId(executionId)
                 .projectId(200L)
                 .memberId(1L)
-                .status("RUNNING")
+                .status(ExecutionStatus.RUNNING)
                 .build();
         given(testExecutionRepository.findById(executionId)).willReturn(Optional.of(execution));
 
         AgentCallbackRequestDto dto = new AgentCallbackRequestDto(
                 executionId,
-                "FAILED",
+                ExecutionStatus.FAILED,
                 1200L,
                 null,
                 List.of()
@@ -122,7 +124,7 @@ class AgentCallbackServiceTest {
         agentCallbackService.handleCallback(dto);
 
         // then
-        assertThat(execution.getStatus()).isEqualTo("FAILED");
+        assertThat(execution.getStatus()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(execution.getCompletedAt()).isNotNull();
         verify(testExecutionRepository).save(execution);
         verify(testResultRepository, never()).saveAll(any());
@@ -139,7 +141,7 @@ class AgentCallbackServiceTest {
         given(testExecutionRepository.findById(nonExistentId)).willReturn(Optional.empty());
 
         AgentCallbackRequestDto dto = new AgentCallbackRequestDto(
-                nonExistentId, "COMPLETED", 1000L, null, List.of()
+                nonExistentId, ExecutionStatus.COMPLETED, 1000L, null, List.of()
         );
 
         // when & then
