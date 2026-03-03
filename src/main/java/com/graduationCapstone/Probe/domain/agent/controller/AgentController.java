@@ -41,7 +41,9 @@ public class AgentController {
             AgentTriggerRequestDto requestDto
     ) {
 
-        agentDispatchService.triggerAgentExecution(
+        // 동기 구간: 존재 확인·유효성 검증 → 실패 시 400/404 즉시 반환
+        // 검증 통과 후 AI 서버 호출은 내부에서 비동기(@Async)로 위임됨
+        agentDispatchService.validateAndPrepare(
                 requestDto.executionId(),
                 requestDto.scenarioId(),
                 requestDto.targetBranch()

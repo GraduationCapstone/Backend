@@ -27,8 +27,9 @@ public class TestResult {
     private String caseName;
 
     // SUCCESS, FAIL
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private String status;
+    private ResultStatus status;
 
     // 에러 메시지나 실행 로그
     @Column(name = "error_log", columnDefinition = "TEXT")

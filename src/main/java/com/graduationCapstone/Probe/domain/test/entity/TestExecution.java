@@ -26,10 +26,10 @@ public class TestExecution {
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
-    // PENDING, RUNNING, PASS, FAILED, BLOCK, UNTEST
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 15)
     @ColumnDefault("'PENDING'")
-    private String status;
+    private ExecutionStatus status;
 
     @Column(name = "duration_ms")
     private Long durationMs;
@@ -46,12 +46,12 @@ public class TestExecution {
     private String reportS3Url;
 
     /** 상태만 단순 변경 (예: FAILED 처리) */
-    public void updateStatus(String status) {
+    public void updateStatus(ExecutionStatus status) {
         this.status = status;
     }
 
     /** 테스트 완료 처리: 상태, 소요 시간, 리포트 URL, 완료 시각을 한번에 갱신 */
-    public void complete(String status, Long durationMs, String reportS3Url) {
+    public void complete(ExecutionStatus status, Long durationMs, String reportS3Url) {
         this.status = status;
         this.durationMs = durationMs;
         this.reportS3Url = reportS3Url;
