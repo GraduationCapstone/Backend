@@ -5,6 +5,7 @@ import com.graduationCapstone.Probe.domain.github.dto.GithubRepoDto;
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoSummaryDto;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import com.graduationCapstone.Probe.global.exception.handler.CustomException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,7 +26,7 @@ public class GithubService {
      * 생성자 직접 작성: 테스트 코드에서 외부 WebClient 주입을 허용하기 위함입니다.
      * @param webClient 설정된 WebClient 객체
      */
-    public GithubService(WebClient webClient) {
+    public GithubService(@Qualifier("githubApiWebClient") WebClient webClient) {
         this.webClient = webClient;
     }
 

@@ -6,8 +6,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
 public class WebClientConfig {
-    @Bean
-    public WebClient webClient() {
+    @Bean("githubApiWebClient")
+    public WebClient githubApiWebClient() {
         return WebClient.builder()
                 .baseUrl("https://api.github.com")
                 .defaultHeader("Accept", "application/vnd.github.v3+json")

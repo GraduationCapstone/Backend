@@ -66,7 +66,8 @@ public class SecurityConfig {
                                 "/api/auth/reissue",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/api/projects/accept"
+                                "/api/projects/accept",
+                                "/api/agent/callback"   // AI 서버 콜백 — VPC 내부 호출, JWT 인증 불필요
                         ).permitAll()
                         .requestMatchers("/api/github/**").authenticated()
                         .anyRequest().authenticated()
