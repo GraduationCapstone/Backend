@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -97,13 +98,19 @@ class ProjectServiceTest {
         @Test
         @DisplayName("프로젝트 생성")
         void createProject_Success() {
-            ProjectCreateRequestDto request = new ProjectCreateRequestDto("New Project", List.of());
+            String requestName = "New Project";
+            ProjectCreateRequestDto request = new ProjectCreateRequestDto(requestName, List.of());
+
             given(userRepository.findById(anyLong())).willReturn(Optional.of(testUser));
             given(projectRepository.save(any(Project.class))).willReturn(testProject);
-
             StepVerifier.create(projectService.createProject(testUser, request))
-                    .assertNext(res -> assertThat(res.projectName()).isEqualTo("Probe Project"))
+                    .assertNext(res -> assertThat(res).isNotNull())
                     .verifyComplete();
+
+            ArgumentCaptor<Project> projectCaptor = ArgumentCaptor.forClass(Project.class);
+            verify(projectRepository, times(1)).save(projectCaptor.capture());
+            Project capturedProject = projectCaptor.getValue();
+            assertThat(capturedProject.getProjectName()).isEqualTo(requestName);
         }
 
         @Test
