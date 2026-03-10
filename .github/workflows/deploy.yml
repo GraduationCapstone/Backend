@@ -52,7 +52,7 @@ jobs:
             --group-id ${{ secrets.AWS_SG_ID }} \
             --protocol tcp \
             --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 \
             --region ${{ secrets.AWS_REGION }}
 
       - name: Deploy to EC2 via SSH
