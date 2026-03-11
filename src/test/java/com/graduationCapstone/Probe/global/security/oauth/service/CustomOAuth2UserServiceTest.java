@@ -89,6 +89,17 @@ class CustomOAuth2UserServiceTest {
         given(oAuth2Util.getOAuth2Response(eq(registrationId), eq(userNameAttributeName), eq(attributes)))
                 .willReturn(responseDto);
 
+        com.graduationCapstone.Probe.domain.user.entity.User mockUserEntity =
+                com.graduationCapstone.Probe.domain.user.entity.User.builder()
+                        .id(1L) // NPE 방지
+                        .githubId("12345")
+                        .username("test-user")
+                        .email("test@example.com")
+                        .build();
+
+        given(userService.saveOrUpdateUser(any(OAuth2ResponseDto.class)))
+                .willReturn(mockUserEntity);
+
         // when
         OAuth2User result = customOAuth2UserService.loadUser(userRequest);
 
