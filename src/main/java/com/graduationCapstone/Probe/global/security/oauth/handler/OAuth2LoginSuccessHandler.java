@@ -49,6 +49,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         cookieUtil.addAccessCookie(response, accessToken);
 
         String targetUrl = UriComponentsBuilder.fromUriString(FRONTEND_REDIRECT_URL)
+                .queryParam("access_token", accessToken)
                 .build().toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
