@@ -20,6 +20,7 @@ spring:
         registration:
           github:
             client-id: ${GH_CLIENT_ID}
+            redirect-uri: "https://api.probe-backend.click/login/oauth2/code/github"
             client-secret: ${GH_CLIENT_SECRET}
             scope:
               - read:user
@@ -59,10 +60,11 @@ app:
   server:
     url: ${SERVER_URL}
 
-# AI 서버 스펙 나오면 수정
-# ai-server:
-  # url: ${AI_SERVER_URL}
-  # api-key: ${AI_SERVER_API_KEY:}
-  # timeout:
-    # connect: 5000
-    # read: 300000
+ai-server:
+  url: ${AI_SERVER_URL}
+  timeout:
+    connect: 5000
+    read: 300000
+
+server:
+  forward-headers-strategy: framework
