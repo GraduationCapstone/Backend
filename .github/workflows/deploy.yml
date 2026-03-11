@@ -78,6 +78,7 @@ jobs:
             echo "MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}" >> .env
             echo "MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}" >> .env
             echo "SERVER_URL=${{ secrets.SERVER_URL }}" >> .env
+            echo "AI_SERVER_URL=${{ secrets.AI_SERVER_URL }}" >> .env
             docker-compose up -d --force-recreate
             docker image prune -f
 
