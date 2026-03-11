@@ -25,9 +25,10 @@ public class CorsConfig {
 
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
 
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST","PUT", "DELETE", "PATCH", "OPTIONS"));
 
         configuration.setAllowCredentials(true);
+
         configuration.setMaxAge(3600L); // 캐시 시간 1시간
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
