@@ -15,6 +15,9 @@ public record ProjectMemberResponseDto(
         @Schema(description = "사용자 이메일", example = "probe@gmail.com", requiredMode = Schema.RequiredMode.REQUIRED)
         String email,
 
+        @Schema(description = "GitHub 프로필 이미지 URL", example = "https://...", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        String profileImageUrl,
+
         @Schema(description = "프로젝트에서의 권한", example = "OWNER", requiredMode = Schema.RequiredMode.REQUIRED)
         ProjectRole role
 ) {
@@ -23,6 +26,7 @@ public record ProjectMemberResponseDto(
                 member.getUser().getId(),
                 member.getUser().getUsername(),
                 member.getUser().getEmail(),
+                member.getUser().getProfileImageUrl(),
                 member.getRole()
         );
     }

@@ -38,22 +38,24 @@ class UserServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     // 테스트용 DTO
-    private OAuth2ResponseDto createDto(String githubId, String username, String email) {
+    private OAuth2ResponseDto createDto(String githubId, String username, String email, String profileImageUrl) {
         return new OAuth2ResponseDto(
                 Collections.emptyMap(),
                 "id",
                 githubId,
                 username,
-                email
+                email,
+                profileImageUrl
         );
     }
 
     // 테스트용 User Entity
-    private User createUser(String githubId, String username, String email, boolean isDeleted) {
+    private User createUser(String githubId, String username, String email, String profileImageUrl, boolean isDeleted) {
         return User.builder()
                 .githubId(githubId)
                 .username(username)
                 .email(email)
+                .profileImageUrl(profileImageUrl)
                 .deleted(isDeleted)
                 .build();
     }
@@ -63,7 +65,7 @@ class UserServiceTest {
     void saveOrUpdateUser_NewUser() {
         // given
         String githubId = "new-github-id";
-        OAuth2ResponseDto dto = createDto(githubId, "new-user", "new@test.com");
+        OAuth2ResponseDto dto = createDto(githubId, "new-user", "new@test.com", "http://new-image.com");
 
         // DB에 해당 githubId가 없음
         given(userRepository.findByGithubId(githubId)).willReturn(Optional.empty());
@@ -84,10 +86,10 @@ class UserServiceTest {
         String oldName = "old-name";
         String newName = "updated-name";
 
-        OAuth2ResponseDto dto = createDto(githubId, newName, "email@test.com");
+        OAuth2ResponseDto dto = createDto(githubId, newName, "email@test.com", "http://new-image.com");
 
         // 기존 유저 (deleted = false)
-        User existingUser = createUser(githubId, oldName, "email@test.com", false);
+        User existingUser = createUser(githubId, oldName, "email@test.com", "http://new-image.com", false);
         given(userRepository.findByGithubId(githubId)).willReturn(Optional.of(existingUser));
 
         // when
@@ -96,6 +98,8 @@ class UserServiceTest {
         // then
         // 객체의 username이 변경되었는지 확인 (updateUsername 동작 검증)
         assertThat(existingUser.getUsername()).isEqualTo(newName);
+        // 객체의 프로필 이미지가 변경되었는지 확인
+        assertThat(existingUser.getProfileImageUrl()).isEqualTo("http://new-image.com");
         // 탈퇴 상태가 아닌지 확인
         assertThat(existingUser.isDeleted()).isFalse();
         // save 호출 확인
@@ -108,10 +112,10 @@ class UserServiceTest {
         // given
         String githubId = "deleted-id";
         String newName = "return-user";
-        OAuth2ResponseDto dto = createDto(githubId, newName, "email@test.com");
+        OAuth2ResponseDto dto = createDto(githubId, newName, "email@test.com", "http://new-image.com");
 
         // 기존 유저 (deleted = true)
-        User deletedUser = createUser(githubId, "old-name", "email@test.com", true);
+        User deletedUser = createUser(githubId, "old-name", "email@test.com", "http://new-image.com",true);
 
         // 실행 전 상태 확인
         assertThat(deletedUser.isDeleted()).isTrue();
@@ -126,6 +130,8 @@ class UserServiceTest {
         assertThat(deletedUser.isDeleted()).isFalse();
         // 닉네임 업데이트 확인
         assertThat(deletedUser.getUsername()).isEqualTo(newName);
+        // 프로필 이미지 업데이트 확인
+        assertThat(deletedUser.getProfileImageUrl()).isEqualTo("http://new-image.com");
         // save 호출 확인
         verify(userRepository).save(deletedUser);
     }
@@ -136,7 +142,7 @@ class UserServiceTest {
         // given
         Long userId = 1L;
         // 활성 상태 유저 생성
-        User user = createUser("gh-id", "user", "email", false);
+        User user = createUser("gh-id", "user", "email", "http://new-image.com",false);
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
 

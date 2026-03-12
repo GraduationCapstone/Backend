@@ -79,7 +79,12 @@ class ProjectServiceTest {
 
     @BeforeEach
     void setUp() {
-        testUser = User.builder().id(1L).email("test@test.com").username("tester").build();
+        testUser = User.builder()
+                .id(1L)
+                .email("test@test.com")
+                .username("tester")
+                .profileImageUrl("http://tester-image.com")
+                .build();
         testProject = Project.builder()
                 .id(10L)
                 .projectName("Probe Project")
@@ -242,6 +247,28 @@ class ProjectServiceTest {
 
             StepVerifier.create(projectService.searchUsers("keyword", testUser))
                     .assertNext(res -> assertThat(res.username()).isEqualTo("other"))
+                    .verifyComplete();
+        }
+
+        @Test
+        @DisplayName("특정 프로젝트 멤버 목록 조회 시 이미지와 권한이 포함된다")
+        void getProjectMembers_Success() {
+            // given
+            ProjectMember member = ProjectMember.builder()
+                    .user(testUser)
+                    .role(ProjectRole.OWNER)
+                    .build();
+            testProject.addMember(member);
+
+            given(projectRepository.findByIdWithMembers(10L)).willReturn(Optional.of(testProject));
+
+            // when & then
+            StepVerifier.create(projectService.getProjectMembers(10L))
+                    .assertNext(list -> {
+                        assertThat(list.get(0).username()).isEqualTo("tester");
+                        assertThat(list.get(0).profileImageUrl()).isEqualTo("http://tester-image.com"); // 💡 이미지 확인
+                        assertThat(list.get(0).role()).isEqualTo(ProjectRole.OWNER); // 💡 역할 확인
+                    })
                     .verifyComplete();
         }
     }

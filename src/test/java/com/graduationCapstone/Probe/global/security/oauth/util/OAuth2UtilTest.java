@@ -32,6 +32,7 @@ class OAuth2UtilTest {
         attributes.put("id", 12345);
         attributes.put("login", "testuser");
         attributes.put("email", "test@example.com");
+        attributes.put("avatar_url", "https://github.com/avatar.png");
 
         // when
         OAuth2ResponseDto result = oAuth2Util.getOAuth2Response(registrationId, userNameAttributeName, attributes);
@@ -41,6 +42,7 @@ class OAuth2UtilTest {
         assertThat(result.githubId()).isEqualTo("12345");
         assertThat(result.username()).isEqualTo("testuser");
         assertThat(result.email()).isEqualTo("test@example.com");
+        assertThat(result.profileImageUrl()).isEqualTo("https://github.com/avatar.png");
     }
 
     @Test

@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,22 +72,31 @@ class CustomOAuth2UserServiceTest {
         OAuth2UserRequest userRequest = new OAuth2UserRequest(clientRegistration, accessToken);
 
         // 외부 API(Delegate)가 반환할 가짜 유저 정보 설정
-        Map<String, Object> attributes = Map.of(
-                "id", 12345,
-                "login", "test-user",
-                "email", "test@example.com"
-        );
+        Map<String, Object> originAttributes = new HashMap<>();
+        originAttributes.put("id", 12345);
+        originAttributes.put("login", "test-user");
+        originAttributes.put("email", "test@example.com");
+        originAttributes.put("avatar_url", "http://github-image.com/avatar.png");
+
         OAuth2User mockOAuth2User = new DefaultOAuth2User(
-                Collections.emptySet(), attributes, userNameAttributeName);
+                Collections.emptySet(), originAttributes, userNameAttributeName);
 
         // delegate.loadUser()가 호출되면 가짜 유저를 반환
         given(mockDelegate.loadUser(any(OAuth2UserRequest.class))).willReturn(mockOAuth2User);
 
+        Map<String, Object> expectedAttributes = new HashMap<>(originAttributes);
+        expectedAttributes.put("githubAccessToken", "access-token");
+
         // OAuth2Util 변환 결과 설정
         OAuth2ResponseDto responseDto = new OAuth2ResponseDto(
-                attributes, userNameAttributeName, "12345", "test-user", "test@example.com");
+                originAttributes,
+                userNameAttributeName,
+                "12345",
+                "test-user",
+                "test@example.com",
+                "http://github-image.com/avatar.png");
 
-        given(oAuth2Util.getOAuth2Response(eq(registrationId), eq(userNameAttributeName), eq(attributes)))
+        given(oAuth2Util.getOAuth2Response(eq(registrationId), eq(userNameAttributeName), eq(originAttributes)))
                 .willReturn(responseDto);
 
         com.graduationCapstone.Probe.domain.user.entity.User mockUserEntity =
@@ -95,6 +105,7 @@ class CustomOAuth2UserServiceTest {
                         .githubId("12345")
                         .username("test-user")
                         .email("test@example.com")
+                        .profileImageUrl("http://github-image.com/avatar.png")
                         .build();
 
         given(userService.saveOrUpdateUser(any(OAuth2ResponseDto.class)))
@@ -109,7 +120,7 @@ class CustomOAuth2UserServiceTest {
 
         // 반환된 OAuth2User 객체가 정상적인지 검증
         assertThat(result).isNotNull();
-        assertThat(result.getAttributes()).isEqualTo(attributes);
+        assertThat(result.getAttributes()).isEqualTo(expectedAttributes);
         assertThat(result.getName()).isEqualTo("12345"); // userNameAttributeName("id") 값
     }
 }

@@ -33,6 +33,7 @@ public class OAuth2Util {
         String extractedGithubId = String.valueOf(attributes.get(userNameAttributeName));
         String extractedUsername = (String) attributes.get("login");
         String extractedEmail = (String) attributes.get("email");
+        String extractedAvatarUrl = (String) attributes.get("avatar_url");;
 
         // GithubID 사용하여 서비스 내에서 고유성 보장하는 임시 이메일 생성
         // 이메일 형식: [githubId]_[Timestamp]@no-email.com
@@ -45,7 +46,8 @@ public class OAuth2Util {
                 userNameAttributeName,
                 extractedGithubId,
                 extractedUsername,
-                extractedEmail
+                extractedEmail,
+                extractedAvatarUrl
         );
     }
 }

@@ -34,6 +34,9 @@ public class User {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
     @Comment("회원의 회원 탈퇴 여부")
     @Column(name = "deleted", columnDefinition = "boolean default false")
     private boolean deleted;
@@ -68,5 +71,9 @@ public class User {
 
     public void updateGithubAccessToken(String token) {
         this.githubAccessToken = token;
+    }
+
+    public void updateProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 }

@@ -33,6 +33,7 @@ class ProjectMemberRepositoryTest {
                 .username("tester")
                 .email("test@test.com")
                 .githubId("1234")
+                .profileImageUrl("https://github.com/avatar.png")
                 .build();
         em.persist(user);
 

@@ -40,9 +40,11 @@ public class UserService {
             if (user.isDeleted()) {
                 user.reactivate();
                 user.updateUsername(attributes.username());
+                user.updateProfileImageUrl(attributes.profileImageUrl());
             } else {
-                // 기존 사용자: 닉네임만 업데이트
+                // 기존 사용자: 닉네임과 프로필 이미지 모두 최신 상태로 업데이트
                 user.updateUsername(attributes.username());
+                user.updateProfileImageUrl(attributes.profileImageUrl());
             }
         } else {
             // 신규 사용자

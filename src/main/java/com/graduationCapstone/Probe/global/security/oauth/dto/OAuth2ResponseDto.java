@@ -20,7 +20,10 @@ public record OAuth2ResponseDto (
         String username,
 
         @Schema(description = "GitHub 이메일", example = "probe@gmail.com")
-        String email
+        String email,
+
+        @Schema(description = "GitHub 프로필 이미지 URL")
+        String profileImageUrl
 ){
 
     /**
@@ -31,6 +34,7 @@ public record OAuth2ResponseDto (
                 .githubId(this.githubId)
                 .username(this.username)
                 .email(this.email)
+                .profileImageUrl(this.profileImageUrl)
                 .build();
     }
 }
