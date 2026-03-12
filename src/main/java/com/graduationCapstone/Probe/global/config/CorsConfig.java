@@ -23,7 +23,7 @@ public class CorsConfig {
         // 프론트엔드 URL 목록
         configuration.setAllowedOrigins(allowedOrigins);
 
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowedHeaders(List.of("*"));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST","PUT", "DELETE", "PATCH", "OPTIONS"));
 
