@@ -9,6 +9,7 @@ import com.graduationCapstone.Probe.domain.project.dto.*;
 import com.graduationCapstone.Probe.domain.project.entity.Project;
 import com.graduationCapstone.Probe.domain.project.entity.ProjectMember;
 import com.graduationCapstone.Probe.domain.project.entity.ProjectRepo;
+import com.graduationCapstone.Probe.domain.project.entity.ProjectRole;
 import com.graduationCapstone.Probe.domain.project.repository.ProjectMemberRepository;
 import com.graduationCapstone.Probe.domain.project.repository.ProjectRepoRepository;
 import com.graduationCapstone.Probe.domain.project.repository.ProjectRepository;
@@ -72,6 +73,7 @@ public class ProjectService {
 
             ProjectMember member = ProjectMember.builder()
                     .user(persistentUser)
+                    .role(ProjectRole.OWNER)
                     .build();
             project.addMember(member);
 
@@ -136,8 +138,10 @@ public class ProjectService {
      * @throws CustomException PROJECT_NOT_FOUND (프로젝트가 없을 경우)
      */
     @Transactional
-    public Mono<Void> updateProjectName(Long projectId, String newProjectName) {
+    public Mono<Void> updateProjectName(Long projectId, Long userId, String newProjectName) {
         return Mono.fromRunnable(() -> {
+            validateOwner(projectId, userId);
+
             Project project = projectRepository.findById(projectId)
                     .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
             project.updateProjectName(newProjectName);
@@ -155,8 +159,10 @@ public class ProjectService {
      * @throws CustomException PROJECT_NOT_FOUND (프로젝트가 없을 경우)
      */
     @Transactional
-    public Mono<Void> deleteProject(Long projectId) {
+    public Mono<Void> deleteProject(Long projectId, Long userId) {
         return Mono.fromRunnable(() -> {
+            validateOwner(projectId, userId);
+
             if (!projectRepository.existsById(projectId)) {
                 throw new CustomException(ErrorCode.PROJECT_NOT_FOUND);
             }
@@ -293,6 +299,7 @@ public class ProjectService {
             if (!isAlreadyMember) {
                 ProjectMember newMember = ProjectMember.builder()
                         .user(user)
+                        .role(ProjectRole.MEMBER)
                         .build();
                 project.addMember(newMember);
                 projectRepository.save(project);
@@ -335,6 +342,10 @@ public class ProjectService {
         return Mono.fromRunnable(() -> {
             ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
                     .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+            if (member.getRole() == ProjectRole.OWNER){
+                throw new CustomException(ErrorCode.OWNER_CANNOT_LEAVE);
+            }
             projectMemberRepository.delete(member);
         }).subscribeOn(Schedulers.boundedElastic()).then();
     }
@@ -349,8 +360,9 @@ public class ProjectService {
      * @throws CustomException PROJECT_NOT_FOUND
      */
     @Transactional
-    public Mono<Void> updateProjectRepos(Long projectId, List<Long> newRepoIds) {
+    public Mono<Void> updateProjectRepos(Long projectId, Long userId, List<Long> newRepoIds) {
         return Mono.fromRunnable(() -> {
+            validateOwner(projectId, userId);
             Project project = projectRepository.findByIdWithRepos(projectId)
                     .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
 
@@ -390,5 +402,14 @@ public class ProjectService {
                     .map(GithubRepoResponseDto::from)
                     .collect(Collectors.toList());
         }).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private void validateOwner(Long projectId, Long userId) {
+        boolean isOwner = projectMemberRepository.existsByProjectIdAndUserIdAndRole(
+                projectId, userId, ProjectRole.OWNER);
+
+        if (!isOwner) {
+            throw new CustomException(ErrorCode.NOT_PROJECT_OWNER);
+        }
     }
 }

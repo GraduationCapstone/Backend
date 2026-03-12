@@ -1,6 +1,7 @@
 package com.graduationCapstone.Probe.domain.project.dto;
 
 import com.graduationCapstone.Probe.domain.project.entity.ProjectMember;
+import com.graduationCapstone.Probe.domain.project.entity.ProjectRole;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "프로젝트 멤버 상세 정보 응답 DTO")
@@ -12,13 +13,17 @@ public record ProjectMemberResponseDto(
         String username,
 
         @Schema(description = "사용자 이메일", example = "probe@gmail.com", requiredMode = Schema.RequiredMode.REQUIRED)
-        String email
+        String email,
+
+        @Schema(description = "프로젝트에서의 권한", example = "OWNER", requiredMode = Schema.RequiredMode.REQUIRED)
+        ProjectRole role
 ) {
     public static ProjectMemberResponseDto from(ProjectMember member) {
         return new ProjectMemberResponseDto(
                 member.getUser().getId(),
                 member.getUser().getUsername(),
-                member.getUser().getEmail()
+                member.getUser().getEmail(),
+                member.getRole()
         );
     }
 }

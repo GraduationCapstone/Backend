@@ -26,6 +26,10 @@ public class ProjectMember {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ProjectRole role;
+
     public void setProject(Project project) {
         if (this.project != null) {
             this.project.getMembers().remove(this);
