@@ -34,6 +34,7 @@ public class User {
     @Column(name = "email", nullable = false, unique = true)
     private String email;
 
+    @Comment("회원의 GitHub 프로필 이미지 URL")
     @Column(name = "profile_image_url")
     private String profileImageUrl;
 
