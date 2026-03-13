@@ -7,11 +7,13 @@ import com.graduationCapstone.Probe.global.exception.handler.CustomException;
 import com.graduationCapstone.Probe.global.security.login.repository.RefreshTokenRepository;
 import com.graduationCapstone.Probe.global.security.oauth.dto.OAuth2ResponseDto;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -28,7 +30,7 @@ public class UserService {
      */
     @Transactional
     public User saveOrUpdateUser(OAuth2ResponseDto attributes) { //CustomOAuth2UserService에서 User 객체 바로 사용할 수 있도록 void -> user 로 리턴 타입 수정
-
+        log.info("OAuth2 유저 정보 저장/업데이트: githubId={}, username={}", attributes.githubId(), attributes.username());
         Optional<User> existingUser = userRepository.findByGithubId(attributes.githubId());
 
         User user;
@@ -38,15 +40,18 @@ public class UserService {
 
             // 탈퇴 계정이라면 재활성화
             if (user.isDeleted()) {
+                log.info("탈퇴 계정 재활성화: userId={}", user.getId());
                 user.reactivate();
                 user.updateUsername(attributes.username());
                 user.updateProfileImageUrl(attributes.profileImageUrl());
             } else {
+                log.debug("기존 사용자 정보 업데이트 진행: userId={}", user.getId());
                 // 기존 사용자: 닉네임과 프로필 이미지 모두 최신 상태로 업데이트
                 user.updateUsername(attributes.username());
                 user.updateProfileImageUrl(attributes.profileImageUrl());
             }
         } else {
+            log.info("신규 사용자 등록 진행: githubId={}", attributes.githubId());
             // 신규 사용자
             user = attributes.toEntity();
         }
@@ -63,13 +68,16 @@ public class UserService {
      */
     @Transactional
     public void deleteUser(Long userId){
-
+        log.info("회원 탈퇴 처리 시작: userId={}", userId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.error("탈퇴 실패: 사용자를 찾을 수 없음 - userId={}", userId);
+                    return new CustomException(ErrorCode.USER_NOT_FOUND);
+                });
 
         refreshTokenRepository.deleteByUserId(userId);
-
         user.deleted(true);
+        log.info("회원 탈퇴 처리 완료: userId={}", userId);
     }
 
     /**
@@ -82,6 +90,7 @@ public class UserService {
      */
     @Transactional
     public User updateGithubToken(Long userId, String token) {
+        log.debug("GitHub AccessToken 업데이트: userId={}", userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.updateGithubAccessToken(token);
