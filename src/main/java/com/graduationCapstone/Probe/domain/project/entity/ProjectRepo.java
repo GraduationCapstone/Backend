@@ -9,7 +9,7 @@ import lombok.*;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(of = "id")
+@EqualsAndHashCode(of = "githubRepo")
 @Table(name = "project_repo", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"project_id", "github_repo_id"})
 })
