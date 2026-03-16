@@ -92,8 +92,12 @@ public class UserService {
     public User updateGithubToken(Long userId, String token) {
         log.debug("GitHub AccessToken 업데이트: userId={}", userId);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> {
+                    log.error("GitHub 토큰 업데이트 실패: 존재하지 않는 사용자 - userId={}", userId);
+                    return new CustomException(ErrorCode.USER_NOT_FOUND);
+                });
         user.updateGithubAccessToken(token);
+        log.info("GitHub AccessToken 업데이트 완료: userId={}", userId);
         return userRepository.saveAndFlush(user);
     }
 

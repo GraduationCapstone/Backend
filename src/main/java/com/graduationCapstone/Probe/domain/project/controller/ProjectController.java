@@ -41,7 +41,7 @@ public class ProjectController {
     public Mono<ResponseEntity<ProjectResponseDto>> createProject(
             @AuthenticationPrincipal User user,
             @Valid @RequestBody ProjectCreateRequestDto request) {
-        if (user == null) return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         return projectService.createProject(user, request).map(ResponseEntity::ok);
     }
 
@@ -53,7 +53,7 @@ public class ProjectController {
     })
     @GetMapping
     public Mono<ResponseEntity<List<ProjectResponseDto>>> getMyProjects(@AuthenticationPrincipal User user) {
-        if (user == null) return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         return projectService.getMyProjects(user)
                 .collectList()
                 .map(ResponseEntity::ok);
@@ -70,6 +70,7 @@ public class ProjectController {
             @AuthenticationPrincipal User user,
             @PathVariable Long projectId,
             @Valid @RequestBody ProjectNameUpdateRequestDto request) {
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         return projectService.updateProjectName(projectId, user.getId(), request.projectName())
                 .thenReturn(ResponseEntity.ok().build());
     }
@@ -84,6 +85,7 @@ public class ProjectController {
     public Mono<ResponseEntity<Void>> deleteProject(
             @AuthenticationPrincipal User user,
             @PathVariable Long projectId) {
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         return projectService.deleteProject(projectId, user.getId())
                 .thenReturn(ResponseEntity.noContent().build());
     }
@@ -198,6 +200,7 @@ public class ProjectController {
             @RequestParam String keyword,
             @AuthenticationPrincipal User user
     ) {
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         return projectService.searchUsers(keyword, user)
                 .collectList()
                 .map(ResponseEntity::ok);
