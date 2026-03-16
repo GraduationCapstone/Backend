@@ -121,6 +121,7 @@ class ProjectServiceTest {
             verify(projectRepository, times(1)).save(projectCaptor.capture());
 
             Project capturedProject = projectCaptor.getValue();
+            assertThat(capturedProject.getProjectName()).isEqualTo(requestName);
             ProjectMember creator = capturedProject.getMembers().iterator().next();
             assertThat(creator.getRole()).isEqualTo(ProjectRole.OWNER);
         }

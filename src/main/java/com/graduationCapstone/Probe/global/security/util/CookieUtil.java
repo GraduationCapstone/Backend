@@ -37,7 +37,7 @@ public class CookieUtil {
 
     // Refresh Token 쿠키 삭제 (로그아웃 시)
     public void deleteRefreshCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, null)
+        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, "")
                 .path("/")
                 .maxAge(0)
                 .secure(true)
