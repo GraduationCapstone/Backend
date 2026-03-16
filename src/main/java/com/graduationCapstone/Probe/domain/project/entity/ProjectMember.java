@@ -9,7 +9,6 @@ import lombok.*;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(of = "id")
 @Table(name = "project_member", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"project_id", "user_id"})
 })
@@ -29,6 +28,18 @@ public class ProjectMember {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ProjectRole role;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ProjectMember that)) return false;
+        return id != null && id.equals(that.getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return 31;
+    }
 
     public void setProject(Project project) {
         if (this.project != null) {
