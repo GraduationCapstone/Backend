@@ -20,35 +20,37 @@ public class CookieUtil {
 
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
     public static final String ACCESS_TOKEN_COOKIE_NAME = "access_token";
+    public static final String JSESSIONID_COOKIE_NAME = "JSESSIONID";
 
 
-    // Refresh Token 쿠키 생성
     public void addRefreshCookie(HttpServletResponse response, String refreshToken) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, refreshToken)
-                .path("/")
-                .httpOnly(true)
-                .secure(true)
-                .sameSite("None")
-                .maxAge(refreshTokenExpirationDays * 24 * 60 * 60)
-                .build();
-
-        response.addHeader("Set-Cookie", cookie.toString());
+        addCookie(response, REFRESH_TOKEN_COOKIE_NAME, refreshToken, refreshTokenExpirationDays * 24 * 60 * 60);
     }
 
-    // Refresh Token 쿠키 삭제 (로그아웃 시)
+    public void addAccessCookie(HttpServletResponse response, String accessToken) {
+        addCookie(response, ACCESS_TOKEN_COOKIE_NAME, accessToken, accessTokenExpirationMinutes * 60);
+    }
+
+    /**
+     * 모든 인증 관련 쿠키 일괄 삭제 (로그아웃/탈퇴 시)
+     */
+    public void deleteAllCookies(HttpServletResponse response) {
+        deleteCookie(response, REFRESH_TOKEN_COOKIE_NAME);
+        deleteCookie(response, ACCESS_TOKEN_COOKIE_NAME);
+        deleteCookie(response, JSESSIONID_COOKIE_NAME);
+    }
+
+    /**
+     * 개별 쿠키 삭제 메서드 (필요 시 선택적 사용)
+     */
     public void deleteRefreshCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, "")
-                .path("/")
-                .maxAge(0)
-                .secure(true)
-                .sameSite("None")
-                .httpOnly(true)
-                .build();
-
-        response.addHeader("Set-Cookie", cookie.toString());
+        deleteCookie(response, REFRESH_TOKEN_COOKIE_NAME);
     }
 
-    // Request에서 Refresh Token 가져오기
+    public void deleteAccessCookie(HttpServletResponse response) {
+        deleteCookie(response, ACCESS_TOKEN_COOKIE_NAME);
+    }
+
     public String getRefreshTokenFromCookie(HttpServletRequest request) {
         return getCookieValue(request, REFRESH_TOKEN_COOKIE_NAME);
     }
@@ -62,16 +64,26 @@ public class CookieUtil {
                 .orElse(null);
     }
 
-    // Access Token 쿠키 생성
-    public void addAccessCookie(HttpServletResponse response, String accessToken) {
-        ResponseCookie cookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE_NAME, accessToken)
+    private void addCookie(HttpServletResponse response, String name, String value, long maxAge) {
+        ResponseCookie cookie = ResponseCookie.from(name, value)
                 .path("/")
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("None")
-                .maxAge(accessTokenExpirationMinutes * 60)
+                .maxAge(maxAge)
                 .build();
+        response.addHeader("Set-Cookie", cookie.toString());
+    }
 
+    private void deleteCookie(HttpServletResponse response, String name) {
+        ResponseCookie cookie = ResponseCookie.from(name, "")
+                .path("/")
+                .maxAge(0)
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("None")
+                .build();
         response.addHeader("Set-Cookie", cookie.toString());
     }
 }
+
