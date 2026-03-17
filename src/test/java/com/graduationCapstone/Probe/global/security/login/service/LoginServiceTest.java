@@ -1,5 +1,7 @@
 package com.graduationCapstone.Probe.global.security.login.service;
 
+import com.graduationCapstone.Probe.global.security.util.CookieUtil;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
@@ -14,11 +16,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -35,8 +41,18 @@ class LoginServiceTest {
     @Mock
     private JwtUtil jwtUtil;
 
+    @Mock
+    private CookieUtil cookieUtil;
+
+    private MockHttpServletResponse response;
+
+    @BeforeEach
+    void setUp() {
+        response = new MockHttpServletResponse();
+    }
+
     @Test
-    @DisplayName("토큰 재발급 성공: 유효한 RT가 들어오면 새로운 AT, RT를 발급하고 DB를 업데이트합니다.")
+    @DisplayName("토큰 재발급 성공: 새 토큰을 쿠키에 추가하는 메서드가 호출되어야 합니다.")
     void reissue_Success() {
         // given
         String oldRefreshToken = "old-refresh-token";
@@ -59,19 +75,17 @@ class LoginServiceTest {
         given(jwtUtil.createRefreshToken(userId)).willReturn(newRefreshToken);
 
         // when
-        TokenResponseDto result = loginService.reissue(oldRefreshToken);
+        TokenResponseDto result = loginService.reissue(oldRefreshToken, response);
 
         // then
-        // 반환된 DTO 값이 새 토큰인지 확인
         assertThat(result.accessToken()).isEqualTo(newAccessToken);
-        assertThat(result.refreshToken()).isEqualTo(newRefreshToken);
-
-        // DB에서 가져온 Entity의 updateToken 메서드가 호출되어 값이 바뀌었는지 확인
-        assertThat(storedToken.getRefreshToken()).isEqualTo(newRefreshToken);
+        // CookieUtil이 제대로 호출되었는지 검증
+        verify(cookieUtil).addAccessCookie(response, newAccessToken);
+        verify(cookieUtil).addRefreshCookie(response, newRefreshToken);
     }
 
     @Test
-    @DisplayName("재발급 실패: Refresh Token이 유효하지 않으면 예외가 발생합니다.")
+    @DisplayName("재발급 실패: 유효하지 않은 토큰이면 쿠키 삭제 메서드가 호출되어야 합니다.")
     void reissue_Fail_InvalidToken() {
         // given
         String invalidToken = "invalid-token";
@@ -80,9 +94,11 @@ class LoginServiceTest {
         given(jwtUtil.validateToken(invalidToken)).willReturn(false);
 
         // when & then
-        assertThatThrownBy(() -> loginService.reissue(invalidToken))
+        assertThatThrownBy(() -> loginService.reissue(invalidToken, response))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_REFRESH_TOKEN);
+
+        verify(cookieUtil).deleteRefreshCookie(response);
     }
 
     @Test
@@ -99,13 +115,13 @@ class LoginServiceTest {
         given(refreshTokenRepository.findById(userId)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> loginService.reissue(refreshToken))
+        assertThatThrownBy(() -> loginService.reissue(refreshToken, response))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.REFRESH_TOKEN_NOT_FOUND);
     }
 
     @Test
-    @DisplayName("재발급 실패: DB에 저장된 토큰과 요청한 토큰이 다르면 예외가 발생합니다.")
+    @DisplayName("재발급 실패: DB 토큰과 미일치 시 쿠키 삭제 메서드가 호출되어야 합니다.")
     void reissue_Fail_Mismatch() {
         // given
         String requestToken = "hacker-token";
@@ -122,24 +138,31 @@ class LoginServiceTest {
         given(refreshTokenRepository.findByUserId(userId)).willReturn(Optional.of(storedToken));
 
         // when & then
-        assertThatThrownBy(() -> loginService.reissue(requestToken))
+        assertThatThrownBy(() -> loginService.reissue(requestToken, response))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.REFRESH_TOKEN_MISMATCH);
+
+        verify(cookieUtil).deleteRefreshCookie(response);
     }
 
     @Test
-    @DisplayName("로그아웃 성공: 토큰에서 ID를 추출해 DB 삭제 메서드를 호출합니다.")
+    @DisplayName("로그아웃 성공: DB에서 삭제하고 모든 쿠키 삭제 메서드(deleteAll)를 호출해야 합니다.")
     void logout_Success() {
         // given
-        String accessToken = "valid-access-token";
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        String accessToken = "valid-access";
         Long userId = 1L;
 
+        // CookieUtil에서 AccessToken을 꺼내오는 상황 Mocking
+        given(cookieUtil.getCookieValue(any(), eq(CookieUtil.ACCESS_TOKEN_COOKIE_NAME))).willReturn(accessToken);
+        given(jwtUtil.validateToken(accessToken)).willReturn(true);
         given(jwtUtil.getUserId(accessToken)).willReturn(userId);
 
         // when
-        loginService.logout(accessToken);
+        loginService.logout(request, response);
 
         // then
         verify(refreshTokenRepository).deleteByUserId(userId);
+        verify(cookieUtil).deleteAllCookies(response);
     }
 }
