@@ -101,6 +101,7 @@ public class ProjectController {
             @AuthenticationPrincipal User user,
             @PathVariable Long projectId,
             @Valid @RequestBody ProjectRepoUpdateRequestDto request) {
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         return projectService.updateProjectRepos(projectId, user.getId(), request.repoIds())
                 .thenReturn(ResponseEntity.ok().build());
     }
