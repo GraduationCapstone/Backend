@@ -12,13 +12,17 @@ public record UserSearchResponseDto(
         String username,
 
         @Schema(description = "사용자 이메일", example = "probe@gmail.com", requiredMode = Schema.RequiredMode.REQUIRED)
-        String email
+        String email,
+
+        @Schema(description = "GitHub 프로필 이미지 URL", example = "https://...", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        String profileImageUrl
 ) {
     public static UserSearchResponseDto from(User user) {
         return new UserSearchResponseDto(
                 user.getId(),
                 user.getUsername(),
-                user.getEmail()
+                user.getEmail(),
+                user.getProfileImageUrl()
         );
     }
 }

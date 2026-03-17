@@ -7,6 +7,7 @@ import com.graduationCapstone.Probe.global.security.oauth.util.OAuth2Util;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -20,6 +21,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
@@ -46,12 +48,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     @Override
     @Transactional
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
+        log.info("OAuth2 로그인 시도 - Provider: {}", userRequest.getClientRegistration().getRegistrationId());
 
         OAuth2User oAuth2User = delegate.loadUser(userRequest);
+        log.info("OAuth2 제공자로부터 유저 속성 로드 완료");
 
         // Github가 발급한 실제 AccessToken 추출(Github 서비스 전용 토큰)
         String githubAccessToken = userRequest.getAccessToken().getTokenValue();
         Map<String, Object> attributes = oAuth2User.getAttributes();
+        log.debug("GitHub AccessToken 및 Attributes 추출 완료");
 
         String registrationId = userRequest.getClientRegistration().getRegistrationId();
         String userNameAttributeName = userRequest.getClientRegistration().getProviderDetails()
@@ -62,10 +67,13 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 userNameAttributeName,
                 attributes
         );
+        log.info("OAuth2ResponseDto 변환 성공 - GitHub ID: {}", oAuth2ResponseDto.githubId());
 
         // 리턴받은 user 객체에 GithubAccessToken 업데이트
         User user = userService.saveOrUpdateUser(oAuth2ResponseDto);
+        log.info("사용자 엔티티 저장/업데이트 완료 - User ID: {}", user.getId());
         userService.updateGithubToken(user.getId(), githubAccessToken);
+        log.info("사용자 GitHub AccessToken DB 업데이트 완료");
 
         Map<String, Object> modifiedAttributes = new HashMap<>(attributes);
         modifiedAttributes.put("githubAccessToken", githubAccessToken);

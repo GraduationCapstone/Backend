@@ -14,6 +14,7 @@ public enum ErrorCode {
     INVALID_REFRESH_TOKEN(HttpStatus.BAD_REQUEST, "INVALID40003", "유효하지 않은 리프레시 토큰입니다."),
     USER_ROLE_EXCEPTION(HttpStatus.BAD_REQUEST, "USER40001", "존재하지 않는 인가 권한입니다."),
     UNSUPPORTED_OAUTH_PROVIDER(HttpStatus.BAD_REQUEST, "AUTH40001", "지원하지 않는 OAuth 제공자입니다."),
+    OWNER_CANNOT_LEAVE(HttpStatus.BAD_REQUEST, "PROJ40001", "프로젝트 소유자는 나갈 수 없습니다."),
 
     // 401 UNAUTHORIZED (인증 실패)
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH40101", "토큰이 유효하지 않거나 만료되었습니다."),
@@ -22,6 +23,7 @@ public enum ErrorCode {
 
     // 403 FORBIDDEN (인가 실패 / 접근 권한 없음)
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH40301", "해당 리소스에 접근할 권한이 없습니다."),
+    NOT_PROJECT_OWNER(HttpStatus.FORBIDDEN, "PROJ40301", "프로젝트 소유자만 접근 가능합니다."),
 
     // 404 NOT FOUND (리소스를 찾지 못함)
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER40401", "회원을 찾지 못했습니다."),

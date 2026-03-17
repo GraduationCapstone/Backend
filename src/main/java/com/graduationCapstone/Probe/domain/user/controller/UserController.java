@@ -1,7 +1,10 @@
 package com.graduationCapstone.Probe.domain.user.controller;
 
+import com.graduationCapstone.Probe.domain.user.dto.UserResponseDto;
 import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.domain.user.service.UserService;
+import com.graduationCapstone.Probe.global.exception.ErrorCode;
+import com.graduationCapstone.Probe.global.exception.handler.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,6 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import reactor.core.publisher.Mono;
 
 @Tag(name = "사용자 관리 (User)", description = "로그인된 사용자의 정보 조회 및 회원탈퇴")
 @RestController
@@ -25,7 +29,7 @@ public class UserController {
 
     private final UserService userService;
 
-    @Operation(summary = "내 정보 조회", description = "유효한 Access Token으로 현재 로그인된 사용자(User)의 상세 정보를 조회합니다.")
+    @Operation(summary = "내 정보 조회", description = "유효한 Access Token으로 현재 로그인된 사용자(User)의 닉네임, 이메일, 프로필 이미지를 조회합니다.")
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -39,8 +43,14 @@ public class UserController {
             )
     })
     @GetMapping("/me")
-    public ResponseEntity<User> get(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(user);
+    public Mono<ResponseEntity<UserResponseDto>> getMyInfo(@AuthenticationPrincipal User user) {
+        if (user == null) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
+        }
+
+        UserResponseDto response = UserResponseDto.from(user);
+
+        return Mono.just(ResponseEntity.ok(response));
     }
 
     @Operation(summary = "회원 탈퇴 (논리적 삭제)", description = "로그인된 사용자 계정을 논리적으로 삭제하고 Refresh Token을 무효화합니다.")

@@ -3,6 +3,7 @@ package com.graduationCapstone.Probe.domain.project.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoResponseDto;
 import com.graduationCapstone.Probe.domain.project.dto.*;
+import com.graduationCapstone.Probe.domain.project.entity.ProjectRole;
 import com.graduationCapstone.Probe.domain.project.service.ProjectService;
 import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.domain.user.repository.UserRepository;
@@ -91,10 +92,10 @@ class ProjectControllerTest {
         }
 
         @Test
-        @DisplayName("프로젝트 이름 수정")
+        @DisplayName("프로젝트 이름 수정(OWNER만 가능)")
         void updateProjectName_Success() throws Exception {
             ProjectNameUpdateRequestDto request = new ProjectNameUpdateRequestDto("New Name");
-            given(projectService.updateProjectName(anyLong(), anyString())).willReturn(Mono.empty());
+            given(projectService.updateProjectName(anyLong(), eq(1L), anyString())).willReturn(Mono.empty());
 
             MvcResult result = mockMvc.perform(patch("/api/projects/10/name").with(csrf()).with(authentication(auth))
                             .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
@@ -104,9 +105,9 @@ class ProjectControllerTest {
         }
 
         @Test
-        @DisplayName("프로젝트 삭제")
+        @DisplayName("프로젝트 삭제(OWNER만 가능)")
         void deleteProject_Success() throws Exception {
-            given(projectService.deleteProject(10L)).willReturn(Mono.empty());
+            given(projectService.deleteProject(eq(10L), eq(1L))).willReturn(Mono.empty());
 
             MvcResult result = mockMvc.perform(delete("/api/projects/10").with(csrf()).with(authentication(auth)))
                     .andExpect(request().asyncStarted()).andReturn();
@@ -171,7 +172,7 @@ class ProjectControllerTest {
         @Test
         @DisplayName("프로젝트 멤버 목록 조회")
         void getProjectMembers_Success() throws Exception {
-            ProjectMemberResponseDto member = new ProjectMemberResponseDto(1L, "testUser", "test@test.com");
+            ProjectMemberResponseDto member = new ProjectMemberResponseDto(1L, "testUser", "test@test.com", "http://other-image.com", ProjectRole.OWNER);
             given(projectService.getProjectMembers(10L)).willReturn(Mono.just(List.of(member)));
 
             MvcResult result = mockMvc.perform(get("/api/projects/10/members").with(authentication(auth)))
@@ -179,7 +180,9 @@ class ProjectControllerTest {
 
             mockMvc.perform(asyncDispatch(result))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[0].username").value("testUser"));
+                    .andExpect(jsonPath("$[0].username").value("testUser"))
+                    .andExpect(jsonPath("$[0].profileImageUrl").value("http://other-image.com"))
+                    .andExpect(jsonPath("$[0].role").value("OWNER"));
         }
 
         @Test
@@ -197,7 +200,7 @@ class ProjectControllerTest {
         @DisplayName("프로젝트 레포지토리 목록 변경")
         void updateProjectRepos_Success() throws Exception {
             ProjectRepoUpdateRequestDto request = new ProjectRepoUpdateRequestDto(List.of(100L));
-            given(projectService.updateProjectRepos(anyLong(), anyList())).willReturn(Mono.empty());
+            given(projectService.updateProjectRepos(eq(10L), eq(1L), anyList())).willReturn(Mono.empty());
 
             MvcResult result = mockMvc.perform(put("/api/projects/10/repos").with(csrf()).with(authentication(auth))
                             .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
@@ -224,7 +227,7 @@ class ProjectControllerTest {
     @Test
     @DisplayName("사용자 검색")
     void searchUsers_Success() throws Exception {
-        UserSearchResponseDto user = new UserSearchResponseDto(2L, "other", "other@test.com");
+        UserSearchResponseDto user = new UserSearchResponseDto(2L, "other", "other@test.com", "http://other-image.com");
         given(projectService.searchUsers(anyString(), any(User.class))).willReturn(Flux.just(user));
 
         MvcResult result = mockMvc.perform(get("/api/projects/users/search").param("keyword", "other").with(authentication(auth)))
@@ -232,6 +235,7 @@ class ProjectControllerTest {
 
         mockMvc.perform(asyncDispatch(result))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].username").value("other"));
+                .andExpect(jsonPath("$[0].username").value("other"))
+                .andExpect(jsonPath("$[0].profileImageUrl").value("http://other-image.com"));
     }
 }

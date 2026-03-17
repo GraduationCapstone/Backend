@@ -13,6 +13,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -20,10 +21,8 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserControllerTest {
@@ -45,6 +44,7 @@ class UserControllerTest {
                 .id(1L)
                 .username("testUser")
                 .email("test@email.com")
+                .profileImageUrl("http://image.com")
                 .githubId("12345")
                 .build();
 
@@ -71,12 +71,17 @@ class UserControllerTest {
     @Test
     @DisplayName("내 정보 조회: 로그인된 사용자 정보를 JSON으로 반환합니다.")
     void getMe_Success() throws Exception {
-        // when & then
-        mockMvc.perform(get("/api/user/me")
+        MvcResult mvcResult = mockMvc.perform(get("/api/user/me")
                         .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(request().asyncStarted()) // 비동기 작업이 시작되었는지 확인
+                .andReturn();
+        // when & then
+        mockMvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("testUser"))
-                .andExpect(jsonPath("$.email").value("test@email.com"));
+                .andExpect(jsonPath("$.email").value("test@email.com"))
+                .andExpect(jsonPath("$.profileImageUrl").value("http://image.com")) // 💡 이미지 포함 확인
+                .andExpect(jsonPath("$.githubId").doesNotExist());
     }
 
     @Test

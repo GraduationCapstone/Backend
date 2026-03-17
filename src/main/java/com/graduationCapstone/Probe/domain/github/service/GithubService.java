@@ -5,6 +5,7 @@ import com.graduationCapstone.Probe.domain.github.dto.GithubRepoDto;
 import com.graduationCapstone.Probe.domain.github.dto.GithubRepoSummaryDto;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import com.graduationCapstone.Probe.global.exception.handler.CustomException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 public class GithubService {
 
@@ -38,12 +40,15 @@ public class GithubService {
      * @return 레포지토리 요약 정보 리스트를 포함한 Mono
      */
     public Mono<List<GithubRepoSummaryDto>> getRepoList(String token) {
+        log.info("GitHub API 레포지토리 목록 요청 시작");
         return webClient.get()
                 .uri("/user/repos?sort=updated&per_page=30")
                 .headers(h -> h.setBearerAuth(token))
                 .retrieve()
                 .onStatus(status -> status.equals(HttpStatus.UNAUTHORIZED),
-                        response -> Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS)))
+                        response -> {
+                            log.error("GitHub API 인증 실패: 401 Unauthorized");
+                            return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));})
                 .bodyToFlux(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .map(repo -> new GithubRepoSummaryDto(
                         (String) repo.get("name"),
@@ -55,8 +60,14 @@ public class GithubService {
                         repo.get("open_issues_count") != null ? (int) repo.get("open_issues_count") : 0
                 ))
                 .collectList()
-                .onErrorMap(e -> !(e instanceof CustomException),
-                        e -> new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
+                .doOnSuccess(list -> log.info("GitHub 레포지토리 목록 조회 완료: count={}", list.size()))
+                .onErrorMap(e -> {
+                    if (!(e instanceof CustomException)) {
+                        log.error("GitHub API 목록 조회 중 오류 발생: {}", e.getMessage());
+                        return new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+                    }
+                    return e;
+                });
     }
 
     /**
@@ -69,6 +80,7 @@ public class GithubService {
      * @return 레포지토리 이름과 파일 리스트를 포함한 GithubRepoDto를 담은 Mono
      */
     public Mono<GithubRepoDto> getRepoFullCode(String owner, String repo, String token) {
+        log.info("레포지토리 전체 코드 추출 시작: owner={}, repo={}", owner, repo);
         return webClient.get()
                 .uri("/repos/{owner}/{repo}", owner, repo)
                 .headers(h -> h.setBearerAuth(token))
@@ -77,6 +89,7 @@ public class GithubService {
                 })
                 .flatMap(repoInfo -> {
                     String defaultBranch = (String) repoInfo.get("default_branch");
+                    log.debug("기본 브랜치 확인: {}", defaultBranch);
 
                     return webClient.get()
                             .uri("/repos/{owner}/{repo}/git/trees/{branch}?recursive=1", owner, repo, defaultBranch)
@@ -91,6 +104,7 @@ public class GithubService {
 
                                 @SuppressWarnings("unchecked")
                                 List<Map<String, Object>> tree = (List<Map<String, Object>>) treeObj;
+                                log.info("Git Tree API 호출 성공: 전체 노드 수={}", tree.size());
 
                                 return Flux.fromIterable(tree)
                                         .filter(node -> "blob".equals(node.get("type"))) // blob(파일)만 선택
@@ -101,9 +115,15 @@ public class GithubService {
                                             return fetchFileContent(apiUrl, path, token);
                                         }, 10)
                                         .collectList()
-                                        .map(files -> new GithubRepoDto(repo, files));
+                                        .map(files -> {
+                                            log.info("코드 추출 완료: {} 개 파일 로드됨", files.size());
+                                            return new GithubRepoDto(repo, files);
+                                        });
                             })
-                            .onErrorResume(e -> Mono.empty());
+                            .onErrorResume(e -> {
+                                log.error("Git Tree 처리 중 오류 발생: {}", e.getMessage());
+                                return Mono.empty();
+                            });
                 });
     }
 
@@ -128,8 +148,7 @@ public class GithubService {
                 .bodyToMono(byte[].class)
                 .map(bytes -> new GithubFileDto(fileName, new String(bytes, StandardCharsets.UTF_8)))
                 .onErrorResume(e -> {
-                    // 시스템 로그에만 원인 출력한 뒤 계속 나머지 파일들 불러오도록 함
-                    System.err.println("[GitHub API Error] 파일 로드 실패: " + fileName + " | 사유: " + e.getMessage());
+                    log.error("[GitHub API Error] 파일 로드 실패: {} | 사유: {}", fileName, e.getMessage());
                     return Mono.just(new GithubFileDto(fileName, ErrorCode.FILE_NOT_FOUND.getMessage()));
                 });
     }

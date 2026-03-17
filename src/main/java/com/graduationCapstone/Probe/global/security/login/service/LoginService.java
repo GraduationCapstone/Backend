@@ -8,8 +8,10 @@ import com.graduationCapstone.Probe.global.security.login.entity.RefreshToken;
 import com.graduationCapstone.Probe.global.security.login.repository.RefreshTokenRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -20,7 +22,9 @@ public class LoginService {
 
     // 토큰 재발급 로직
     public TokenResponseDto reissue(String refreshToken) {
+        log.info("토큰 재발급 요청 시작");
         if (!jwtUtil.validateToken(refreshToken)) {
+            log.warn("토큰 재발급 실패: 유효하지 않은 리프레시 토큰");
             throw new CustomException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
@@ -38,12 +42,14 @@ public class LoginService {
 
         storedToken.updateToken(newRefreshToken);
 
+        log.info("토큰 재발급 완료: userId={}", userId);
         return new TokenResponseDto(newAccessToken, newRefreshToken);
     }
 
     // 로그아웃 로직
     public void logout(String accessToken) {
         Long userId = jwtUtil.getUserId(accessToken);
+        log.info("로그아웃: userId={}", userId);
         refreshTokenRepository.deleteByUserId(userId);
     }
 }

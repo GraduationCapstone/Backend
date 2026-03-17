@@ -41,7 +41,7 @@ public class ProjectController {
     public Mono<ResponseEntity<ProjectResponseDto>> createProject(
             @AuthenticationPrincipal User user,
             @Valid @RequestBody ProjectCreateRequestDto request) {
-        if (user == null) return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         return projectService.createProject(user, request).map(ResponseEntity::ok);
     }
 
@@ -53,7 +53,7 @@ public class ProjectController {
     })
     @GetMapping
     public Mono<ResponseEntity<List<ProjectResponseDto>>> getMyProjects(@AuthenticationPrincipal User user) {
-        if (user == null) return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         return projectService.getMyProjects(user)
                 .collectList()
                 .map(ResponseEntity::ok);
@@ -67,25 +67,30 @@ public class ProjectController {
     })
     @PatchMapping("/{projectId}/name")
     public Mono<ResponseEntity<Void>> updateProjectName(
+            @AuthenticationPrincipal User user,
             @PathVariable Long projectId,
             @Valid @RequestBody ProjectNameUpdateRequestDto request) {
-        return projectService.updateProjectName(projectId, request.projectName())
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
+        return projectService.updateProjectName(projectId, user.getId(), request.projectName())
                 .thenReturn(ResponseEntity.ok().build());
     }
 
-    @Operation(summary = "프로젝트 삭제",
+    @Operation(summary = "프로젝트 삭제(OWNER 전용)",
                description = "프로젝트를 삭제하고 연관된 멤버 및 레포지토리 연결 정보를 모두 제거합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "삭제 성공 (No Content)"),
             @ApiResponse(responseCode = "404", description = "프로젝트를 찾을 수 없음")
     })
     @DeleteMapping("/{projectId}")
-    public Mono<ResponseEntity<Void>> deleteProject(@PathVariable Long projectId) {
-        return projectService.deleteProject(projectId)
+    public Mono<ResponseEntity<Void>> deleteProject(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long projectId) {
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
+        return projectService.deleteProject(projectId, user.getId())
                 .thenReturn(ResponseEntity.noContent().build());
     }
 
-    @Operation(summary = "프로젝트 레포지토리 목록 변경",
+    @Operation(summary = "프로젝트 레포지토리 목록 변경(OWNER 전용)",
                description = "기존 연결을 초기화하고 새로운 레포지토리 목록으로 교체합니다.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "변경 성공"),
@@ -93,9 +98,11 @@ public class ProjectController {
     })
     @PutMapping("/{projectId}/repos")
     public Mono<ResponseEntity<Void>> updateProjectRepos(
+            @AuthenticationPrincipal User user,
             @PathVariable Long projectId,
             @Valid @RequestBody ProjectRepoUpdateRequestDto request) {
-        return projectService.updateProjectRepos(projectId, request.repoIds())
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
+        return projectService.updateProjectRepos(projectId, user.getId(), request.repoIds())
                 .thenReturn(ResponseEntity.ok().build());
     }
 
@@ -194,6 +201,7 @@ public class ProjectController {
             @RequestParam String keyword,
             @AuthenticationPrincipal User user
     ) {
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
         return projectService.searchUsers(keyword, user)
                 .collectList()
                 .map(ResponseEntity::ok);
