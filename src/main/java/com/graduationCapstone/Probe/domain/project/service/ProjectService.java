@@ -147,10 +147,9 @@ public class ProjectService {
     public Mono<Void> updateProjectName(Long projectId, Long userId, String newProjectName) {
         log.info("프로젝트명 수정 시도: projectId={}, userId={}, newName={}", projectId, userId, newProjectName);
         return Mono.fromRunnable(() -> {
-            validateOwner(projectId, userId);
-
             Project project = projectRepository.findById(projectId)
                     .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+            validateOwner(projectId, userId);
             project.updateProjectName(newProjectName);
             log.info("프로젝트명 수정 완료: projectId={}", projectId);
         }).subscribeOn(Schedulers.boundedElastic()).then();
@@ -170,11 +169,9 @@ public class ProjectService {
     public Mono<Void> deleteProject(Long projectId, Long userId) {
         log.warn("프로젝트 삭제 시도: projectId={}, userId={}", projectId, userId);
         return Mono.fromRunnable(() -> {
-            validateOwner(projectId, userId);
-
             if (!projectRepository.existsById(projectId)) {
-                throw new CustomException(ErrorCode.PROJECT_NOT_FOUND);
-            }
+                throw new CustomException(ErrorCode.PROJECT_NOT_FOUND);}
+            validateOwner(projectId, userId);
             projectRepository.deleteById(projectId);
             log.info("프로젝트 삭제 완료: projectId={}", projectId);
         }).subscribeOn(Schedulers.boundedElastic()).then();
@@ -189,19 +186,24 @@ public class ProjectService {
      * @return 검색된 사용자 정보를 담은 리스트
      */
     public Flux<UserSearchResponseDto> searchUsers(String keyword, User currentUser) {
+        log.info("사용자 검색 시작: keyword={}, requester={}", keyword, currentUser.getUsername());
         return Mono.fromCallable(() -> {
                     List<User> users = userRepository.findByUsernameContainingOrEmailContaining(keyword, keyword)
                             .stream()
                             .filter(user -> !user.getId().equals(currentUser.getId()))
                             .toList();
 
-                    if (users.isEmpty()) return List.<UserSearchResponseDto>of();
+                    if (users.isEmpty()) {
+                        log.debug("검색 결과 없음: keyword={}", keyword);
+                        return List.<UserSearchResponseDto>of();
+                    }
 
                     return users.stream()
                             .map(UserSearchResponseDto::from)
                             .toList();
                 }).subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(Flux::fromIterable);
+                .flatMapMany(Flux::fromIterable)
+                .doOnComplete(() -> log.info("사용자 검색 완료: keyword={}", keyword));
     }
 
     /**
@@ -320,12 +322,15 @@ public class ProjectService {
                     .anyMatch(m -> m.getUser().getId().equals(user.getId()));
 
             if (!isAlreadyMember) {
+                log.info("이미 멤버인 사용자: projectId={}, email={}", projectId, email);
+            } else {
                 ProjectMember newMember = ProjectMember.builder()
                         .user(user)
                         .role(ProjectRole.MEMBER)
                         .build();
                 project.addMember(newMember);
                 projectRepository.save(project);
+                log.info("신규 멤버 등록 성공: projectId={}, email={}", projectId, email);
             }
         }).subscribeOn(Schedulers.boundedElastic()).then();
     }
@@ -338,6 +343,7 @@ public class ProjectService {
      * @throws CustomException ErrorCode.PROJECT_NOT_FOUND - 프로젝트가 존재하지 않을 경우
      */
     public Mono<List<ProjectMemberResponseDto>> getProjectMembers(Long projectId) {
+        log.info("멤버 목록 조회: projectId={}", projectId);
         return Mono.fromCallable(() -> {
             Project project = projectRepository.findByIdWithMembers(projectId)
                     .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
@@ -345,7 +351,8 @@ public class ProjectService {
             return project.getMembers().stream()
                     .map(ProjectMemberResponseDto::from)
                     .toList();
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic())
+                .doOnSuccess(list -> log.info("멤버 목록 조회 완료: projectId={}, count={}", projectId, list.size()));
     }
 
     /**
@@ -387,10 +394,11 @@ public class ProjectService {
      */
     @Transactional
     public Mono<Void> updateProjectRepos(Long projectId, Long userId, List<Long> newRepoIds) {
+        log.info("레포지토리 목록 수정 시작: projectId={}, userId={}, newRepoIds={}", projectId, userId, newRepoIds);
         return Mono.fromRunnable(() -> {
-            validateOwner(projectId, userId);
             Project project = projectRepository.findByIdWithRepos(projectId)
                     .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+            validateOwner(projectId, userId);
 
             project.getProjectRepos().clear();
 
@@ -398,6 +406,7 @@ public class ProjectService {
                 List<GithubRepo> repos = githubRepoRepository.findAllById(newRepoIds);
 
                 if (repos.size() != newRepoIds.size()) {
+                    log.error("레포 수정 실패: 일부 레포를 찾을 수 없음 - 요청 IDs: {}", newRepoIds);
                     throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
                 }
 
@@ -409,6 +418,7 @@ public class ProjectService {
                 }
             }
             projectRepository.save(project);
+            log.info("레포지토리 목록 수정 완료: projectId={}", projectId);
         }).subscribeOn(Schedulers.boundedElastic()).then();
     }
 
@@ -419,6 +429,7 @@ public class ProjectService {
      * @return 연결된 레포지토리 정보 리스트
      */
     public Mono<List<GithubRepoResponseDto>> getProjectRepoList(Long projectId) {
+        log.info("프로젝트 레포 목록 조회: projectId={}", projectId);
         return Mono.fromCallable(() -> {
             Project project = projectRepository.findByIdWithRepos(projectId)
                     .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
@@ -427,7 +438,8 @@ public class ProjectService {
                     .map(ProjectRepo::getGithubRepo)
                     .map(GithubRepoResponseDto::from)
                     .collect(Collectors.toList());
-        }).subscribeOn(Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic())
+                .doOnSuccess(list -> log.info("레포 목록 조회 완료: projectId={}, count={}", projectId, list.size()));
     }
 
     private void validateOwner(Long projectId, Long userId) {
