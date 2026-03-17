@@ -5,6 +5,8 @@ import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.domain.user.service.UserService;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import com.graduationCapstone.Probe.global.exception.handler.CustomException;
+import com.graduationCapstone.Probe.global.security.util.CookieUtil;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,6 +30,7 @@ import reactor.core.publisher.Mono;
 public class UserController {
 
     private final UserService userService;
+    private final CookieUtil cookieUtil;
 
     @Operation(summary = "내 정보 조회", description = "유효한 Access Token으로 현재 로그인된 사용자(User)의 닉네임, 이메일, 프로필 이미지를 조회합니다.")
     @ApiResponses({
@@ -60,9 +63,14 @@ public class UserController {
             @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음 (논리적 삭제 과정 중)")
     })
     @DeleteMapping("/me")
-    public ResponseEntity<Void> delete(@AuthenticationPrincipal User user) {
-        Long userId = user.getId();
-        userService.deleteUser(userId);
-        return ResponseEntity.noContent().build();
+    public Mono<ResponseEntity<Void>> delete(
+            @AuthenticationPrincipal User user,
+            HttpServletResponse response) {
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
+
+        return Mono.fromRunnable(() -> {
+            userService.deleteUser(user.getId());
+            cookieUtil.deleteAllCookies(response);
+        }).then(Mono.just(ResponseEntity.noContent().build()));
     }
 }

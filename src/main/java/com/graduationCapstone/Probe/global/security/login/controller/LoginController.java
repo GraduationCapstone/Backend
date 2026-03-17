@@ -49,7 +49,7 @@ public class LoginController {
             throw new CustomException(ErrorCode.REFRESH_TOKEN_NOT_FOUND);
         }
 
-        TokenResponseDto tokenResponseDto = loginService.reissue(refreshToken);
+        TokenResponseDto tokenResponseDto = loginService.reissue(refreshToken, response);
 
         cookieUtil.addRefreshCookie(response, tokenResponseDto.refreshToken());
 
@@ -65,19 +65,14 @@ public class LoginController {
             @ApiResponse(responseCode = "204", description = "로그아웃(Refresh Token 삭제) 성공"),
             @ApiResponse(responseCode = "401", description = "Access Token이 유효하지 않거나 누락됨")
     })
-    @SecurityRequirement(name = "BearerAuth") // JWT 인증 필요
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-            @RequestHeader("Authorization") String accessToken,
+            HttpServletRequest request,
             HttpServletResponse response
     ) {
-        if (accessToken == null || !accessToken.startsWith("Bearer ")) {
-            throw new CustomException(ErrorCode.INVALID_TOKEN);
-        }
 
-        String token = accessToken.substring("Bearer ".length());
-        loginService.logout(token);
-        cookieUtil.deleteRefreshCookie(response);
+        loginService.logout(request, response);
+
         return ResponseEntity.noContent().build();
     }
 }
