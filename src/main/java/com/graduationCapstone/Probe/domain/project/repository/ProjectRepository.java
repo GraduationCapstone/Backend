@@ -1,6 +1,7 @@
 package com.graduationCapstone.Probe.domain.project.repository;
 
 import com.graduationCapstone.Probe.domain.project.entity.Project;
+import com.graduationCapstone.Probe.domain.project.entity.ProjectRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,4 +27,6 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             "LEFT JOIN FETCH m.user " +
             "WHERE p.id = :id")
     Optional<Project> findByIdWithMembers(@Param("id") Long id);
+
+    boolean existsByProjectNameAndMembers_User_IdAndMembers_Role(String projectName, Long userId, ProjectRole role);
 }

@@ -65,6 +65,11 @@ public class ProjectService {
     public Mono<ProjectResponseDto> createProject(User user, ProjectCreateRequestDto request) {
         log.info("프로젝트 생성 시작: creator={}, projectName={}", user.getUsername(), request.projectName());
         return Mono.fromCallable(() -> {
+            if (projectRepository.existsByProjectNameAndMembers_User_IdAndMembers_Role(
+                    request.projectName(), user.getId(), ProjectRole.OWNER)) {
+                throw new CustomException(ErrorCode.DUPLICATE_PROJECT_NAME);
+            }
+
             User persistentUser = userRepository.findById(user.getId())
                     .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
@@ -188,7 +193,7 @@ public class ProjectService {
     public Flux<UserSearchResponseDto> searchUsers(String keyword, User currentUser) {
         log.info("사용자 검색 시작: keyword={}, requester={}", keyword, currentUser.getUsername());
         return Mono.fromCallable(() -> {
-                    List<User> users = userRepository.findByUsernameContainingOrEmailContaining(keyword, keyword)
+                    List<User> users = userRepository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(keyword, keyword)
                             .stream()
                             .filter(user -> !user.getId().equals(currentUser.getId()))
                             .toList();
