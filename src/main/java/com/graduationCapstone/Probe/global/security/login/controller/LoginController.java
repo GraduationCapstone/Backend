@@ -2,7 +2,6 @@ package com.graduationCapstone.Probe.global.security.login.controller;
 
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import com.graduationCapstone.Probe.global.exception.handler.CustomException;
-import com.graduationCapstone.Probe.global.security.login.dto.TokenResponseDto;
 import com.graduationCapstone.Probe.global.security.login.service.LoginService;
 import com.graduationCapstone.Probe.global.security.util.CookieUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,8 +15,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 
 @Tag(name = "인증 관리 (Auth)", description = "JWT 토큰 재발급 및 로그아웃 처리")
 @RestController
