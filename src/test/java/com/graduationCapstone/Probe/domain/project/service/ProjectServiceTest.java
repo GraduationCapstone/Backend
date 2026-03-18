@@ -111,11 +111,18 @@ class ProjectServiceTest {
             String requestName = "New Project";
             ProjectCreateRequestDto request = new ProjectCreateRequestDto(requestName, List.of());
 
+            given(projectRepository.existsByProjectNameAndMembers_User_IdAndMembers_Role(
+                    eq(requestName), eq(testUser.getId()), eq(ProjectRole.OWNER)))
+                    .willReturn(false);
+
             given(userRepository.findById(anyLong())).willReturn(Optional.of(testUser));
             given(projectRepository.save(any(Project.class))).willReturn(testProject);
             StepVerifier.create(projectService.createProject(testUser, request))
                     .assertNext(res -> assertThat(res).isNotNull())
                     .verifyComplete();
+
+            verify(projectRepository).existsByProjectNameAndMembers_User_IdAndMembers_Role(
+                    eq(requestName), eq(testUser.getId()), eq(ProjectRole.OWNER));
 
             ArgumentCaptor<Project> projectCaptor = ArgumentCaptor.forClass(Project.class);
             verify(projectRepository, times(1)).save(projectCaptor.capture());
@@ -157,11 +164,15 @@ class ProjectServiceTest {
         @Test
         @DisplayName("프로젝트 삭제 실패(OWNER가 아닌 경우)")
         void delete_Fail_NotOwner() {
+            Long projectId = 10L;
+            Long userId = 2L;
+
+            given(projectRepository.existsById(projectId)).willReturn(true);
             // OWNER가 아니라고 가정
-            given(projectMemberRepository.existsByProjectIdAndUserIdAndRole(10L, 2L, ProjectRole.OWNER))
+            given(projectMemberRepository.existsByProjectIdAndUserIdAndRole(projectId, userId, ProjectRole.OWNER))
                     .willReturn(false);
 
-            StepVerifier.create(projectService.deleteProject(10L, 2L))
+            StepVerifier.create(projectService.deleteProject(projectId, userId))
                     .expectErrorMatches(e -> e instanceof CustomException &&
                             ((CustomException) e).getErrorCode() == ErrorCode.NOT_PROJECT_OWNER)
                     .verify();
@@ -242,13 +253,19 @@ class ProjectServiceTest {
         @Test
         @DisplayName("사용자 검색 (나 자신은 제외)")
         void searchUsers_Success() {
+            String keyword = "pRoBe";
             User other = User.builder().id(2L).username("other").email("o@o.com").build();
-            given(userRepository.findByUsernameContainingOrEmailContaining(anyString(), anyString()))
+            given(userRepository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(eq(keyword), eq(keyword)))
                     .willReturn(List.of(testUser, other));
 
             StepVerifier.create(projectService.searchUsers("keyword", testUser))
-                    .assertNext(res -> assertThat(res.username()).isEqualTo("other"))
+                    .assertNext(res -> {
+                        assertThat(res.username()).isEqualTo("other_user");
+                        assertThat(res.userId()).isNotEqualTo(testUser.getId());
+                    })
                     .verifyComplete();
+
+            verify(userRepository).findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(eq(keyword), eq(keyword));
         }
 
         @Test
