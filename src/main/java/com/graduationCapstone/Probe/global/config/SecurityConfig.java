@@ -56,19 +56,6 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                .logout(logout -> logout
-                        .logoutUrl("/api/auth/logout")
-                        .deleteCookies(CookieUtil.JSESSIONID_COOKIE_NAME, CookieUtil.ACCESS_TOKEN_COOKIE_NAME, CookieUtil.REFRESH_TOKEN_COOKIE_NAME)
-                        .invalidateHttpSession(true)
-                        .clearAuthentication(true)
-                        .logoutSuccessHandler((request, response, authentication) -> {
-                            response.setStatus(HttpServletResponse.SC_OK);
-                            response.setCharacterEncoding("UTF-8");
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"message\":\"로그아웃 성공\"}");
-                        })
-                )
-
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         // 모든 경로에 대해 인증 없이 허용

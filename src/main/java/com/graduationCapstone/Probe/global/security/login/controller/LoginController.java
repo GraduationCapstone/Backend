@@ -28,12 +28,12 @@ public class LoginController {
     private final LoginService loginService;
     private final CookieUtil cookieUtil;
 
-    @Operation(summary = "Access Token 재발급", description = "만료된 Access Token을 Refresh Token을 통해 새롭게 발급 받습니다.")
+    @Operation(summary = "Access Token 재발급", description = " 쿠키의 Refresh Token을 검증하여 새로운 Access/Refresh Token을 모두 쿠키로 재발급합니다.")
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "새로운 Access Token 및 Refresh Token 발급 성공",
-                    content = @Content(schema = @Schema(implementation = TokenResponseDto.class))
+                    description = "토큰 재발급 성공",
+                    content = @Content // Body 없음
             ),
             @ApiResponse(responseCode = "401", description = "Refresh Token이 유효하지 않거나 만료됨"),
             @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
@@ -49,21 +49,16 @@ public class LoginController {
             throw new CustomException(ErrorCode.REFRESH_TOKEN_NOT_FOUND);
         }
 
-        TokenResponseDto tokenResponseDto = loginService.reissue(refreshToken, response);
+        loginService.reissue(refreshToken, response);
 
-        cookieUtil.addRefreshCookie(response, tokenResponseDto.refreshToken());
+        return ResponseEntity.noContent().build();
 
-        return ResponseEntity.ok(new TokenResponseDto(
-                tokenResponseDto.accessToken(),
-                null
-        ));
     }
 
 
-    @Operation(summary = "로그아웃", description = "Refresh Token을 DB에서 삭제하여 토큰 재발급 경로를 차단합니다.")
+    @Operation(summary = "로그아웃", description = "Refresh Token을 DB에서 삭제하고, 브라우저에 저장된 모든 인증 관련 쿠키를 제거합니다.")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "로그아웃(Refresh Token 삭제) 성공"),
-            @ApiResponse(responseCode = "401", description = "Access Token이 유효하지 않거나 누락됨")
+            @ApiResponse(responseCode = "204", description = "로그아웃(Refresh Token 삭제) 성공")
     })
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
