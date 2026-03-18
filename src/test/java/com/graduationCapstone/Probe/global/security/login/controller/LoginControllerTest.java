@@ -64,9 +64,7 @@ class LoginControllerTest {
 
         // when & then
         mockMvc.perform(post("/api/auth/reissue"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value(newAccessToken)) // Body에는 AT만 있어야 함
-                .andExpect(jsonPath("$.refreshToken").isEmpty()); // Controller에서 RT는 null로 내려줌
+                .andExpect(status().isNoContent());
 
         verify(loginService).reissue(eq(refreshToken), any(HttpServletResponse.class));
     }
