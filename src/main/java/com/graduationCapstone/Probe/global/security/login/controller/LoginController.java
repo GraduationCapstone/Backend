@@ -31,7 +31,7 @@ public class LoginController {
     @Operation(summary = "Access Token 재발급", description = " 쿠키의 Refresh Token을 검증하여 새로운 Access/Refresh Token을 모두 쿠키로 재발급합니다.")
     @ApiResponses({
             @ApiResponse(
-                    responseCode = "200",
+                    responseCode = "204",
                     description = "토큰 재발급 성공",
                     content = @Content // Body 없음
             ),
@@ -39,7 +39,7 @@ public class LoginController {
             @ApiResponse(responseCode = "404", description = "사용자를 찾을 수 없음")
     })
     @PostMapping("/reissue")
-    public ResponseEntity<TokenResponseDto> reissue(
+    public ResponseEntity<Void> reissue(
             HttpServletRequest request,
             HttpServletResponse response
     ) {
