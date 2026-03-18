@@ -4,8 +4,10 @@ import com.graduationCapstone.Probe.global.security.jwt.handler.JwtAuthenticatio
 import com.graduationCapstone.Probe.global.security.oauth.handler.OAuth2LoginSuccessHandler;
 import com.graduationCapstone.Probe.global.security.jwt.filter.JwtFilter;
 import com.graduationCapstone.Probe.global.security.oauth.service.CustomOAuth2UserService;
+import com.graduationCapstone.Probe.global.security.util.CookieUtil;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -64,6 +66,7 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/**",
                                 "/api/auth/reissue",
+                                "/api/auth/logout",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/api/projects/accept",

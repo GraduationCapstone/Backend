@@ -20,10 +20,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,19 +58,13 @@ class LoginControllerTest {
                 .willReturn(refreshToken);
 
         // 서비스가 재발급을 성공한다고 가정
-        given(loginService.reissue(refreshToken)).willReturn(serviceResponse);
-
-        // CookieUtil이 응답에 쿠키를 추가하는 동작 Mocking
-        doNothing().when(cookieUtil).addRefreshCookie(any(HttpServletResponse.class), eq(newRefreshToken));
+        given(loginService.reissue(eq(refreshToken), any(HttpServletResponse.class))).willReturn(serviceResponse);
 
         // when & then
         mockMvc.perform(post("/api/auth/reissue"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value(newAccessToken)) // Body에는 AT만 있어야 함
-                .andExpect(jsonPath("$.refreshToken").isEmpty()); // Controller에서 RT는 null로 내려줌
+                .andExpect(status().isNoContent());
 
-        // 쿠키 굽는 메서드가 진짜 호출되었는지 확인
-        verify(cookieUtil).addRefreshCookie(any(HttpServletResponse.class), eq(newRefreshToken));
+        verify(loginService).reissue(eq(refreshToken), any(HttpServletResponse.class));
     }
 
     @Test
@@ -97,22 +89,14 @@ class LoginControllerTest {
     }
 
     @Test
-    @DisplayName("로그아웃 성공: 헤더 검증 후 서비스 로그아웃과 쿠키 삭제 메서드를 호출합니다.")
+    @DisplayName("로그아웃 성공: 헤더 없이 요청해도 서비스의 logout(request, response)이 호출되어야 함")
     void logout_Success() throws Exception {
-        // given
-        String accessToken = "valid-access-token";
-        String authHeader = "Bearer " + accessToken;
-
-        doNothing().when(loginService).logout(accessToken);
-        doNothing().when(cookieUtil).deleteRefreshCookie(any(HttpServletResponse.class));
-
         // when & then
-        mockMvc.perform(post("/api/auth/logout")
-                        .header("Authorization", authHeader))
+        mockMvc.perform(post("/api/auth/logout")) // 💡 Header 제거됨
                 .andExpect(status().isNoContent());
 
-        // Verify
-        verify(loginService).logout(accessToken); // "Bearer " 떼고 넘겼는지 확인
-        verify(cookieUtil).deleteRefreshCookie(any(HttpServletResponse.class));
+        // then
+        // 서비스가 request와 response를 받아서 내부에서 처리하는지 확인
+        verify(loginService).logout(any(HttpServletRequest.class), any(HttpServletResponse.class));
     }
 }
