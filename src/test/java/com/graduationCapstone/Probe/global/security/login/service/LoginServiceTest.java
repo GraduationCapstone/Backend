@@ -79,6 +79,7 @@ class LoginServiceTest {
 
         // then
         assertThat(result.accessToken()).isEqualTo(newAccessToken);
+        assertThat(storedToken.getRefreshToken()).isEqualTo(newRefreshToken);
         // CookieUtil이 제대로 호출되었는지 검증
         verify(cookieUtil).addAccessCookie(response, newAccessToken);
         verify(cookieUtil).addRefreshCookie(response, newRefreshToken);
@@ -112,12 +113,14 @@ class LoginServiceTest {
         given(jwtUtil.getUserId(refreshToken)).willReturn(userId);
 
         // DB 조회 결과가 Empty
-        given(refreshTokenRepository.findById(userId)).willReturn(Optional.empty());
+        given(refreshTokenRepository.findByUserId(userId)).willReturn(Optional.empty());
 
         // when & then
         assertThatThrownBy(() -> loginService.reissue(refreshToken, response))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.REFRESH_TOKEN_NOT_FOUND);
+
+        verify(cookieUtil).deleteRefreshCookie(response);
     }
 
     @Test

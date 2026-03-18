@@ -62,17 +62,13 @@ class LoginControllerTest {
         // 서비스가 재발급을 성공한다고 가정
         given(loginService.reissue(eq(refreshToken), any(HttpServletResponse.class))).willReturn(serviceResponse);
 
-        // CookieUtil이 응답에 쿠키를 추가하는 동작 Mocking
-        doNothing().when(cookieUtil).addRefreshCookie(any(HttpServletResponse.class), eq(newRefreshToken));
-
         // when & then
         mockMvc.perform(post("/api/auth/reissue"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value(newAccessToken)) // Body에는 AT만 있어야 함
                 .andExpect(jsonPath("$.refreshToken").isEmpty()); // Controller에서 RT는 null로 내려줌
 
-        // 쿠키 굽는 메서드가 진짜 호출되었는지 확인
-        verify(cookieUtil).addRefreshCookie(any(HttpServletResponse.class), eq(newRefreshToken));
+        verify(loginService).reissue(eq(refreshToken), any(HttpServletResponse.class));
     }
 
     @Test
