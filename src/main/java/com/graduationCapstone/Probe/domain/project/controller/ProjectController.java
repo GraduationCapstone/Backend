@@ -130,7 +130,7 @@ public class ProjectController {
         return projectService.acceptInvitationByToken(token)
                 .then(Mono.fromCallable(() -> {
                     Context context = new Context();
-                    String htmlContent = templateEngine.process("project/accept-success", context);
+                    String htmlContent = templateEngine.process("mail/accept-success", context);
 
                     return ResponseEntity.ok()
                             .header("Content-Type", "text/html; charset=UTF-8")
@@ -139,7 +139,7 @@ public class ProjectController {
                 .onErrorResume(e -> Mono.fromCallable(() -> {
                     Context context = new Context();
                     context.setVariable("errorMessage", "유효하지 않거나 만료된 초대장입니다.");
-                    String htmlContent = templateEngine.process("project/accept-failure", context);
+                    String htmlContent = templateEngine.process("mail/accept-failure", context);
 
                     return ResponseEntity.badRequest()
                             .header("Content-Type", "text/html; charset=UTF-8")
