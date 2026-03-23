@@ -326,7 +326,7 @@ public class ProjectService {
             boolean isAlreadyMember = project.getMembers().stream()
                     .anyMatch(m -> m.getUser().getId().equals(user.getId()));
 
-            if (!isAlreadyMember) {
+            if (isAlreadyMember) {
                 log.info("이미 멤버인 사용자: projectId={}, email={}", projectId, email);
             } else {
                 ProjectMember newMember = ProjectMember.builder()
