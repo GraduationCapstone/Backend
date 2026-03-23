@@ -64,44 +64,59 @@ public class ProjectService {
     @Transactional
     public Mono<ProjectResponseDto> createProject(User user, ProjectCreateRequestDto request) {
         log.info("프로젝트 생성 시작: creator={}, projectName={}", user.getUsername(), request.projectName());
-        return Mono.fromCallable(() -> {
-            if (projectRepository.existsByProjectNameAndMembers_User_IdAndMembers_Role(
-                    request.projectName(), user.getId(), ProjectRole.OWNER)) {
-                throw new CustomException(ErrorCode.DUPLICATE_PROJECT_NAME);
-            }
+        return checkProjectNameDuplicate(user.getId(), request.projectName())
+                .flatMap(isDuplicate -> {
+                    if (isDuplicate) {
+                        return Mono.error(new CustomException(ErrorCode.DUPLICATE_PROJECT_NAME));
+                    }
 
-            User persistentUser = userRepository.findById(user.getId())
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                    return Mono.fromCallable(() -> {
+                        User persistentUser = userRepository.findById(user.getId())
+                                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-            Project project = Project.builder()
-                    .projectName(request.projectName())
-                    .build();
+                        Project project = Project.builder()
+                                .projectName(request.projectName())
+                                .build();
 
-            ProjectMember member = ProjectMember.builder()
-                    .user(persistentUser)
-                    .role(ProjectRole.OWNER)
-                    .build();
-            project.addMember(member);
+                        ProjectMember member = ProjectMember.builder()
+                                .user(persistentUser)
+                                .role(ProjectRole.OWNER)
+                                .build();
+                        project.addMember(member);
 
-            if (request.repoIds() != null && !request.repoIds().isEmpty()) {
-                List<GithubRepo> repos = githubRepoRepository.findAllById(request.repoIds());
+                        if (request.repoIds() != null && !request.repoIds().isEmpty()) {
+                            List<GithubRepo> repos = githubRepoRepository.findAllById(request.repoIds());
 
-                if (repos.size() != request.repoIds().size()) {
-                    throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
-                }
+                            if (repos.size() != request.repoIds().size()) {
+                                throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
+                            }
 
-                for (GithubRepo repo : repos) {
-                    ProjectRepo pr = ProjectRepo.builder()
-                            .githubRepo(repo)
-                            .build();
-                    project.addProjectRepo(pr);
-                }
-            }
-            Project savedProject = projectRepository.save(project);
-            log.info("프로젝트 생성 성공: id={}", savedProject.getId());
-            return ProjectResponseDto.from(savedProject);
-        }).subscribeOn(Schedulers.boundedElastic())
+                            for (GithubRepo repo : repos) {
+                                ProjectRepo pr = ProjectRepo.builder()
+                                        .githubRepo(repo)
+                                        .build();
+                                project.addProjectRepo(pr);
+                            }
+                        }
+                        Project savedProject = projectRepository.save(project);
+                        log.info("프로젝트 생성 성공: id={}", savedProject.getId());
+                        return ProjectResponseDto.from(savedProject);
+                    });
+                }).subscribeOn(Schedulers.boundedElastic())
                 .doOnError(e -> log.error("프로젝트 생성 실패: {}", e.getMessage()));
+    }
+
+    /**
+     * 프로젝트 이름 중복 여부를 확인합니다.
+     * @param userId      사용자 ID
+     * @param projectName 확인할 프로젝트 이름
+     * @return 중복 여부 (true: 중복)
+     */
+    public Mono<Boolean> checkProjectNameDuplicate(Long userId, String projectName) {
+        return Mono.fromCallable(() ->
+                projectRepository.existsByProjectNameAndMembers_User_IdAndMembers_Role(
+                        projectName, userId, ProjectRole.OWNER)
+        ).subscribeOn(Schedulers.boundedElastic());
     }
 
     /**
@@ -151,13 +166,20 @@ public class ProjectService {
     @Transactional
     public Mono<Void> updateProjectName(Long projectId, Long userId, String newProjectName) {
         log.info("프로젝트명 수정 시도: projectId={}, userId={}, newName={}", projectId, userId, newProjectName);
-        return Mono.fromRunnable(() -> {
-            Project project = projectRepository.findById(projectId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
-            validateOwner(projectId, userId);
-            project.updateProjectName(newProjectName);
-            log.info("프로젝트명 수정 완료: projectId={}", projectId);
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        return checkProjectNameDuplicate(userId, newProjectName)
+                .flatMap(isDuplicate -> {
+                    if (isDuplicate) {
+                        return Mono.error(new CustomException(ErrorCode.DUPLICATE_PROJECT_NAME));
+                    }
+
+                    return Mono.fromRunnable(() -> {
+                        Project project = projectRepository.findById(projectId)
+                                .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+                        validateOwner(projectId, userId);
+                        project.updateProjectName(newProjectName);
+                        log.info("프로젝트명 수정 완료: projectId={}", projectId);
+                    });
+                }).subscribeOn(Schedulers.boundedElastic()).then();
     }
 
     /**
