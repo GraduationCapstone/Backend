@@ -283,27 +283,28 @@ public class ProjectService {
      * @return 비동기 처리가 완료됨을 나타내는 {@link Mono}
      */
     private Mono<Void> sendInviteToSingleUser(Long projectId, String email, String projectName) {
-        return Mono.fromRunnable(() -> {
-            if (!userRepository.existsByEmail(email)) return;
+        return Mono.fromCallable(() -> userRepository.existsByEmail(email))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(exists -> {
+                    if (!exists) return Mono.empty();
 
-            String token = UUID.randomUUID().toString();
-            String redisKey = "invite:" + token;
-            InviteTokenInfo info = new InviteTokenInfo(projectId, email);
+                    String token = UUID.randomUUID().toString();
+                    String redisKey = "invite:" + token;
+                    InviteTokenInfo info = new InviteTokenInfo(projectId, email);
 
-            try {
-                String jsonValue = objectMapper.writeValueAsString(info);
-                redisTemplate.opsForValue()
-                        .set(redisKey, jsonValue, Duration.ofHours(24))
-                        .subscribe();
+                    try {
+                        String jsonValue = objectMapper.writeValueAsString(info);
+                        String link = serverUrl + "/api/projects/accept?token=" + token;
 
-                String link = serverUrl + "/api/projects/accept?token=" + token;
+                        return redisTemplate.opsForValue()
+                                .set(redisKey, jsonValue, Duration.ofHours(24))
+                                .then(Mono.fromRunnable(() -> emailService.sendInvitationEmail(email, link, projectName)).subscribeOn(Schedulers.boundedElastic()));
 
-                emailService.sendInvitationEmail(email, link, projectName);
-
-            } catch (JsonProcessingException e) {
-                throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-            }
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+                    } catch (JsonProcessingException e) {
+                        return Mono.<Void>error(new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
+                    }
+                })
+                .then();
     }
 
     /**
