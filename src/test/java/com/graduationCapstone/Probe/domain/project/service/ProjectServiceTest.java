@@ -28,6 +28,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.data.redis.core.ReactiveValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -74,6 +77,9 @@ class ProjectServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
     private User testUser;
     private Project testProject;
 
@@ -96,6 +102,17 @@ class ProjectServiceTest {
 
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.delete(anyString())).willReturn(Mono.just(true));
+
+        given(transactionTemplate.execute(any())).willAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
+
+        doAnswer(invocation -> {
+            java.util.function.Consumer<TransactionStatus> callback = invocation.getArgument(0);
+            callback.accept(mock(TransactionStatus.class));
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
 
         // 기본적으로 권한 체크 통과하도록 함(필요한 테스트에서만 재정의)
         given(projectMemberRepository.existsByProjectIdAndUserIdAndRole(anyLong(), anyLong(), eq(ProjectRole.OWNER)))
@@ -131,6 +148,8 @@ class ProjectServiceTest {
             assertThat(capturedProject.getProjectName()).isEqualTo(requestName);
             ProjectMember creator = capturedProject.getMembers().iterator().next();
             assertThat(creator.getRole()).isEqualTo(ProjectRole.OWNER);
+
+            verify(transactionTemplate, atLeastOnce()).execute(any());
         }
 
         @Test
@@ -148,9 +167,13 @@ class ProjectServiceTest {
         @Test
         @DisplayName("프로젝트 이름 수정(OWNER만 가능)")
         void updateName_Success() {
+            given(projectRepository.existsByProjectNameAndMembers_User_IdAndMembers_Role(anyString(), anyLong(), any()))
+                    .willReturn(false);
             given(projectRepository.findById(10L)).willReturn(Optional.of(testProject));
             StepVerifier.create(projectService.updateProjectName(10L, 1L, "New Name")).verifyComplete();
             assertThat(testProject.getProjectName()).isEqualTo("New Name");
+
+            verify(transactionTemplate).executeWithoutResult(any());
         }
 
         @Test
@@ -159,6 +182,8 @@ class ProjectServiceTest {
             given(projectRepository.existsById(10L)).willReturn(true);
             StepVerifier.create(projectService.deleteProject(10L, 1L)).verifyComplete();
             verify(projectRepository).deleteById(10L);
+
+            verify(transactionTemplate).executeWithoutResult(any());
         }
 
         @Test
@@ -195,6 +220,8 @@ class ProjectServiceTest {
 
             verify(emailService, timeout(1000).times(1))
                     .sendInvitationEmail(eq("invite@test.com"), anyString(), eq("Probe Project"));
+
+            verify(transactionTemplate).execute(any());
         }
 
         @Test
@@ -215,6 +242,8 @@ class ProjectServiceTest {
             boolean hasMemberRole = capturedProject.getMembers().stream()
                     .anyMatch(m -> m.getRole() == ProjectRole.MEMBER);
             assertThat(hasMemberRole).isTrue();
+
+            verify(transactionTemplate).executeWithoutResult(any());
         }
 
         @Test
@@ -236,6 +265,8 @@ class ProjectServiceTest {
 
             StepVerifier.create(projectService.removeMember(10L, 1L)).verifyComplete();
             verify(projectMemberRepository).delete(member);
+
+            verify(transactionTemplate).executeWithoutResult(any());
         }
 
         @Test
@@ -258,9 +289,9 @@ class ProjectServiceTest {
             given(userRepository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(eq(keyword), eq(keyword)))
                     .willReturn(List.of(testUser, other));
 
-            StepVerifier.create(projectService.searchUsers("keyword", testUser))
+            StepVerifier.create(projectService.searchUsers(keyword, testUser))
                     .assertNext(res -> {
-                        assertThat(res.username()).isEqualTo("other_user");
+                        assertThat(res.username()).isEqualTo("other");
                         assertThat(res.userId()).isNotEqualTo(testUser.getId());
                     })
                     .verifyComplete();
@@ -284,10 +315,11 @@ class ProjectServiceTest {
             StepVerifier.create(projectService.getProjectMembers(10L))
                     .assertNext(list -> {
                         assertThat(list.get(0).username()).isEqualTo("tester");
-                        assertThat(list.get(0).profileImageUrl()).isEqualTo("http://tester-image.com"); // 💡 이미지 확인
-                        assertThat(list.get(0).role()).isEqualTo(ProjectRole.OWNER); // 💡 역할 확인
+                        assertThat(list.get(0).profileImageUrl()).isEqualTo("http://tester-image.com"); // 이미지 확인
+                        assertThat(list.get(0).role()).isEqualTo(ProjectRole.OWNER); // 역할 확인
                     })
                     .verifyComplete();
+            verify(transactionTemplate).execute(any());
         }
     }
 
@@ -303,6 +335,8 @@ class ProjectServiceTest {
 
             StepVerifier.create(projectService.updateProjectRepos(10L, 1L, List.of(50L))).verifyComplete();
             verify(projectRepository).save(testProject);
+
+            verify(transactionTemplate).executeWithoutResult(any());
         }
 
         @Test
@@ -312,6 +346,8 @@ class ProjectServiceTest {
             StepVerifier.create(projectService.getProjectRepoList(10L))
                     .assertNext(list -> assertThat(list).isNotNull())
                     .verifyComplete();
+
+            verify(transactionTemplate).execute(any());
         }
     }
 }

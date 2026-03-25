@@ -45,6 +45,17 @@ public class ProjectController {
         return projectService.createProject(user, request).map(ResponseEntity::ok);
     }
 
+    @Operation(summary = "프로젝트 이름 중복 체크",
+            description = "사용자가 소유한 프로젝트 중 동일한 이름이 있는지 확인합니다.")
+    @GetMapping("/check-name")
+    public Mono<ResponseEntity<Boolean>> checkProjectNameDuplicate(
+            @AuthenticationPrincipal User user,
+            @RequestParam String name) {
+        if (user == null) throw new CustomException(ErrorCode.UNAUTHORIZED_ACCESS);
+        return projectService.checkProjectNameDuplicate(user.getId(), name)
+                .map(ResponseEntity::ok);
+    }
+
     @Operation(summary = "내 프로젝트 목록 조회",
                description = "자신이 참여 중인 모든 프로젝트를 조회합니다.")
     @ApiResponses(value = {

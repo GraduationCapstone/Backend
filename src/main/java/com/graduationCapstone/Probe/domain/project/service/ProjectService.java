@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.ReactiveRedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -30,13 +30,13 @@ import reactor.core.scheduler.Schedulers;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
@@ -48,6 +48,8 @@ public class ProjectService {
     private final ReactiveRedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
     private final EmailService emailService;
+
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${app.server.url}")
     private String serverUrl;
@@ -61,47 +63,66 @@ public class ProjectService {
      * @return 생성된 프로젝트의 상세 정보 (DTO)
      * @throws CustomException USER_NOT_FOUND (유저 정보가 없을 경우)
      */
-    @Transactional
     public Mono<ProjectResponseDto> createProject(User user, ProjectCreateRequestDto request) {
         log.info("프로젝트 생성 시작: creator={}, projectName={}", user.getUsername(), request.projectName());
-        return Mono.fromCallable(() -> {
-            if (projectRepository.existsByProjectNameAndMembers_User_IdAndMembers_Role(
-                    request.projectName(), user.getId(), ProjectRole.OWNER)) {
-                throw new CustomException(ErrorCode.DUPLICATE_PROJECT_NAME);
-            }
+        return checkProjectNameDuplicate(user.getId(), request.projectName())
+                .flatMap(isDuplicate -> {
+                    if (isDuplicate) {
+                        return Mono.error(new CustomException(ErrorCode.DUPLICATE_PROJECT_NAME));
+                    }
 
-            User persistentUser = userRepository.findById(user.getId())
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                    return Mono.fromCallable(() -> {
+                        ProjectResponseDto response = transactionTemplate.execute(status -> {
+                            User persistentUser = userRepository.findById(user.getId())
+                                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-            Project project = Project.builder()
-                    .projectName(request.projectName())
-                    .build();
+                            Project project = Project.builder()
+                                    .projectName(request.projectName())
+                                    .build();
 
-            ProjectMember member = ProjectMember.builder()
-                    .user(persistentUser)
-                    .role(ProjectRole.OWNER)
-                    .build();
-            project.addMember(member);
+                            ProjectMember member = ProjectMember.builder()
+                                    .user(persistentUser)
+                                    .project(project)
+                                    .role(ProjectRole.OWNER)
+                                    .build();
+                            project.addMember(member);
 
-            if (request.repoIds() != null && !request.repoIds().isEmpty()) {
-                List<GithubRepo> repos = githubRepoRepository.findAllById(request.repoIds());
+                            if (request.repoIds() != null && !request.repoIds().isEmpty()) {
+                                List<GithubRepo> repos = githubRepoRepository.findAllById(request.repoIds());
 
-                if (repos.size() != request.repoIds().size()) {
-                    throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
-                }
+                                if (repos.size() != request.repoIds().size()) {
+                                    throw new CustomException(ErrorCode.REPOSITORY_NOT_FOUND);
+                                }
 
-                for (GithubRepo repo : repos) {
-                    ProjectRepo pr = ProjectRepo.builder()
-                            .githubRepo(repo)
-                            .build();
-                    project.addProjectRepo(pr);
-                }
-            }
-            Project savedProject = projectRepository.save(project);
-            log.info("프로젝트 생성 성공: id={}", savedProject.getId());
-            return ProjectResponseDto.from(savedProject);
-        }).subscribeOn(Schedulers.boundedElastic())
+                                for (GithubRepo repo : repos) {
+                                    ProjectRepo pr = ProjectRepo.builder()
+                                            .githubRepo(repo)
+                                            .build();
+                                    project.addProjectRepo(pr);
+                                }
+                            }
+                            Project savedProject = projectRepository.save(project);
+                            log.info("프로젝트 생성 성공: id={}", savedProject.getId());
+                            return ProjectResponseDto.from(savedProject);
+                        });
+                        return Objects.requireNonNull(response);
+                    });
+                })
+                .subscribeOn(Schedulers.boundedElastic())
                 .doOnError(e -> log.error("프로젝트 생성 실패: {}", e.getMessage()));
+    }
+
+    /**
+     * 프로젝트 이름 중복 여부를 확인합니다.
+     * @param userId      사용자 ID
+     * @param projectName 확인할 프로젝트 이름
+     * @return 중복 여부 (true: 중복)
+     */
+    public Mono<Boolean> checkProjectNameDuplicate(Long userId, String projectName) {
+        return Mono.fromCallable(() ->
+                projectRepository.existsByProjectNameAndMembers_User_IdAndMembers_Role(
+                        projectName, userId, ProjectRole.OWNER)
+        ).subscribeOn(Schedulers.boundedElastic());
     }
 
     /**
@@ -148,16 +169,23 @@ public class ProjectService {
      * @return Void
      * @throws CustomException PROJECT_NOT_FOUND (프로젝트가 없을 경우)
      */
-    @Transactional
     public Mono<Void> updateProjectName(Long projectId, Long userId, String newProjectName) {
         log.info("프로젝트명 수정 시도: projectId={}, userId={}, newName={}", projectId, userId, newProjectName);
-        return Mono.fromRunnable(() -> {
-            Project project = projectRepository.findById(projectId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
-            validateOwner(projectId, userId);
-            project.updateProjectName(newProjectName);
-            log.info("프로젝트명 수정 완료: projectId={}", projectId);
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        return checkProjectNameDuplicate(userId, newProjectName)
+                .flatMap(isDuplicate -> {
+                    if (isDuplicate) {
+                        return Mono.error(new CustomException(ErrorCode.DUPLICATE_PROJECT_NAME));
+                    }
+
+                    return Mono.fromRunnable(() -> transactionTemplate.executeWithoutResult(status -> {
+                        Project project = projectRepository.findById(projectId)
+                                .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+                        validateOwner(projectId, userId);
+                        project.updateProjectName(newProjectName);
+                        log.info("프로젝트명 수정 완료: projectId={}", projectId);
+                    }));
+                })
+                .subscribeOn(Schedulers.boundedElastic()).then();
     }
 
     /**
@@ -170,16 +198,16 @@ public class ProjectService {
      * @return Void
      * @throws CustomException PROJECT_NOT_FOUND (프로젝트가 없을 경우)
      */
-    @Transactional
     public Mono<Void> deleteProject(Long projectId, Long userId) {
         log.warn("프로젝트 삭제 시도: projectId={}, userId={}", projectId, userId);
-        return Mono.fromRunnable(() -> {
+        return Mono.fromRunnable(() -> transactionTemplate.executeWithoutResult(status -> {
             if (!projectRepository.existsById(projectId)) {
-                throw new CustomException(ErrorCode.PROJECT_NOT_FOUND);}
+                throw new CustomException(ErrorCode.PROJECT_NOT_FOUND);
+            }
             validateOwner(projectId, userId);
             projectRepository.deleteById(projectId);
             log.info("프로젝트 삭제 완료: projectId={}", projectId);
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        })).subscribeOn(Schedulers.boundedElastic()).then();
     }
 
     /**
@@ -219,11 +247,15 @@ public class ProjectService {
      * @return 비동기 처리가 완료됨을 나타내는 {@link Mono}
      * @throws CustomException ErrorCode.PROJECT_NOT_FOUND - 프로젝트가 존재하지 않을 경우 발생
      */
-    @Transactional
     public Mono<Void> inviteMembers(Long projectId, List<String> emails) {
         log.info("프로젝트 멤버 초대 시작: projectId={}, targetEmails={}", projectId, emails);
-        return Mono.fromCallable(() -> projectRepository.findById(projectId)
-                        .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND)))
+        return Mono.fromCallable(() -> {
+                    Project project = transactionTemplate.execute(status ->
+                            projectRepository.findById(projectId)
+                                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND))
+                    );
+                    return java.util.Objects.requireNonNull(project);
+                })
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(project -> {
                     String projectName = project.getProjectName();
@@ -251,27 +283,28 @@ public class ProjectService {
      * @return 비동기 처리가 완료됨을 나타내는 {@link Mono}
      */
     private Mono<Void> sendInviteToSingleUser(Long projectId, String email, String projectName) {
-        return Mono.fromRunnable(() -> {
-            if (!userRepository.existsByEmail(email)) return;
+        return Mono.fromCallable(() -> userRepository.existsByEmail(email))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(exists -> {
+                    if (!exists) return Mono.empty();
 
-            String token = UUID.randomUUID().toString();
-            String redisKey = "invite:" + token;
-            InviteTokenInfo info = new InviteTokenInfo(projectId, email);
+                    String token = UUID.randomUUID().toString();
+                    String redisKey = "invite:" + token;
+                    InviteTokenInfo info = new InviteTokenInfo(projectId, email);
 
-            try {
-                String jsonValue = objectMapper.writeValueAsString(info);
-                redisTemplate.opsForValue()
-                        .set(redisKey, jsonValue, Duration.ofHours(24))
-                        .subscribe();
+                    try {
+                        String jsonValue = objectMapper.writeValueAsString(info);
+                        String link = serverUrl + "/api/projects/accept?token=" + token;
 
-                String link = serverUrl + "/api/projects/accept?token=" + token;
+                        return redisTemplate.opsForValue()
+                                .set(redisKey, jsonValue, Duration.ofHours(24))
+                                .then(Mono.fromRunnable(() -> emailService.sendInvitationEmail(email, link, projectName)).subscribeOn(Schedulers.boundedElastic()));
 
-                emailService.sendInvitationEmail(email, link, projectName);
-
-            } catch (JsonProcessingException e) {
-                throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-            }
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+                    } catch (JsonProcessingException e) {
+                        return Mono.<Void>error(new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
+                    }
+                })
+                .then();
     }
 
     /**
@@ -283,7 +316,6 @@ public class ProjectService {
      * @throws CustomException ErrorCode.INVITATION_NOT_FOUND - 토큰이 만료되었거나 존재하지 않을 경우
      * @throws CustomException ErrorCode.INTERNAL_SERVER_ERROR - 데이터 파싱 중 오류 발생 시
      */
-    @Transactional
     public Mono<Void> acceptInvitationByToken(String token) {
         log.info("초대 수락 시도: tokenKey=invite:{}", token);
         String redisKey = "invite:" + token;
@@ -316,28 +348,48 @@ public class ProjectService {
      * @return 비동기 처리가 완료됨을 나타내는 {@link Mono}
      */
     private Mono<Void> saveMemberToDb(Long projectId, String email) {
-        return Mono.fromRunnable(() -> {
-            Project project = projectRepository.findByIdWithMembers(projectId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+        String lockKey = "lock:project:join:" + projectId + ":" + email; //락의 키를 프로젝트ID와 이메일 조합으로 생성
 
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return redisTemplate.opsForValue()
+                // 락 획득 시도 (10초 타임아웃으로 데드락 방지)
+                .setIfAbsent(lockKey, "locked", Duration.ofSeconds(10))
+                .flatMap(isLocked -> {
+                    if (Boolean.FALSE.equals(isLocked)) {
+                        // 락 획득 실패 시: 이미 다른 요청 처리 중
+                        log.warn("동일한 초대 수락 요청이 처리 중입니다: email={}", email);
+                        return Mono.empty();
+                    }
 
-            boolean isAlreadyMember = project.getMembers().stream()
-                    .anyMatch(m -> m.getUser().getId().equals(user.getId()));
+                    Mono<Void> businessLogic = Mono.fromRunnable(() -> transactionTemplate.executeWithoutResult(status -> {
+                                Project project = projectRepository.findByIdWithMembers(projectId)
+                                        .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
 
-            if (!isAlreadyMember) {
-                log.info("이미 멤버인 사용자: projectId={}, email={}", projectId, email);
-            } else {
-                ProjectMember newMember = ProjectMember.builder()
-                        .user(user)
-                        .role(ProjectRole.MEMBER)
-                        .build();
-                project.addMember(newMember);
-                projectRepository.save(project);
-                log.info("신규 멤버 등록 성공: projectId={}, email={}", projectId, email);
-            }
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+                                User user = userRepository.findByEmail(email)
+                                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+                                boolean isAlreadyMember = project.getMembers().stream()
+                                        .anyMatch(m -> m.getUser().getId().equals(user.getId()));
+
+                                if (isAlreadyMember) {
+                                    log.info("이미 멤버인 사용자: projectId={}, email={}", projectId, email);
+                                } else {
+                                    ProjectMember newMember = ProjectMember.builder()
+                                            .user(user)
+                                            .project(project)
+                                            .role(ProjectRole.MEMBER)
+                                            .build();
+                                    project.addMember(newMember);
+                                    projectRepository.save(project);
+                                    log.info("신규 멤버 등록 성공: projectId={}, email={}", projectId, email);
+                                }
+                            })).subscribeOn(Schedulers.boundedElastic()).then();
+
+                            return businessLogic
+                                .doFinally(signalType ->
+                                            redisTemplate.opsForValue().delete(lockKey).subscribe()
+                            );
+                })
+                .then();
     }
 
     /**
@@ -350,12 +402,15 @@ public class ProjectService {
     public Mono<List<ProjectMemberResponseDto>> getProjectMembers(Long projectId) {
         log.info("멤버 목록 조회: projectId={}", projectId);
         return Mono.fromCallable(() -> {
-            Project project = projectRepository.findByIdWithMembers(projectId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+            List<ProjectMemberResponseDto> members = transactionTemplate.execute(status -> {
+                Project project = projectRepository.findByIdWithMembers(projectId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
 
-            return project.getMembers().stream()
-                    .map(ProjectMemberResponseDto::from)
-                    .toList();
+                return project.getMembers().stream()
+                        .map(ProjectMemberResponseDto::from)
+                        .toList();
+            });
+            return Objects.requireNonNull(members);
         }).subscribeOn(Schedulers.boundedElastic())
                 .doOnSuccess(list -> log.info("멤버 목록 조회 완료: projectId={}, count={}", projectId, list.size()));
     }
@@ -372,18 +427,18 @@ public class ProjectService {
      * @return Void
      * @throws CustomException USER_NOT_FOUND (해당 멤버가 프로젝트에 없는 경우)
      */
-    @Transactional
     public Mono<Void> removeMember(Long projectId, Long userId) {
         log.info("멤버 프로젝트 탈퇴 시도: projectId={}, userId={}", projectId, userId);
-        return Mono.fromRunnable(() -> {
+        return Mono.fromRunnable(() -> transactionTemplate.executeWithoutResult(status -> {
             ProjectMember member = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
                     .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-            if (member.getRole() == ProjectRole.OWNER){
+            if (member.getRole() == ProjectRole.OWNER) {
                 throw new CustomException(ErrorCode.OWNER_CANNOT_LEAVE);
             }
             projectMemberRepository.delete(member);
-        }).subscribeOn(Schedulers.boundedElastic())
+        }))
+                .subscribeOn(Schedulers.boundedElastic())
                 .doOnSuccess(v -> log.info("멤버 탈퇴 완료: userId={}", userId))
                 .then();
     }
@@ -397,10 +452,9 @@ public class ProjectService {
      * @return Void
      * @throws CustomException PROJECT_NOT_FOUND
      */
-    @Transactional
     public Mono<Void> updateProjectRepos(Long projectId, Long userId, List<Long> newRepoIds) {
         log.info("레포지토리 목록 수정 시작: projectId={}, userId={}, newRepoIds={}", projectId, userId, newRepoIds);
-        return Mono.fromRunnable(() -> {
+        return Mono.fromRunnable(() -> transactionTemplate.executeWithoutResult(status -> {
             Project project = projectRepository.findByIdWithRepos(projectId)
                     .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
             validateOwner(projectId, userId);
@@ -424,7 +478,7 @@ public class ProjectService {
             }
             projectRepository.save(project);
             log.info("레포지토리 목록 수정 완료: projectId={}", projectId);
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        })).subscribeOn(Schedulers.boundedElastic()).then();
     }
 
     /**
@@ -436,13 +490,16 @@ public class ProjectService {
     public Mono<List<GithubRepoResponseDto>> getProjectRepoList(Long projectId) {
         log.info("프로젝트 레포 목록 조회: projectId={}", projectId);
         return Mono.fromCallable(() -> {
-            Project project = projectRepository.findByIdWithRepos(projectId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+            List<GithubRepoResponseDto> repos = transactionTemplate.execute(status -> {
+                Project project = projectRepository.findByIdWithRepos(projectId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
 
-            return project.getProjectRepos().stream()
-                    .map(ProjectRepo::getGithubRepo)
-                    .map(GithubRepoResponseDto::from)
-                    .collect(Collectors.toList());
+                return project.getProjectRepos().stream()
+                        .map(ProjectRepo::getGithubRepo)
+                        .map(GithubRepoResponseDto::from)
+                        .collect(Collectors.toList());
+            });
+            return Objects.requireNonNull(repos);
         }).subscribeOn(Schedulers.boundedElastic())
                 .doOnSuccess(list -> log.info("레포 목록 조회 완료: projectId={}, count={}", projectId, list.size()));
     }
