@@ -348,29 +348,48 @@ public class ProjectService {
      * @return 비동기 처리가 완료됨을 나타내는 {@link Mono}
      */
     private Mono<Void> saveMemberToDb(Long projectId, String email) {
-        return Mono.fromRunnable(() -> transactionTemplate.executeWithoutResult(status -> {
-            Project project = projectRepository.findByIdWithMembers(projectId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
+        String lockKey = "lock:project:join:" + projectId + ":" + email; //락의 키를 프로젝트ID와 이메일 조합으로 생성
 
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return redisTemplate.opsForValue()
+                // 락 획득 시도 (10초 타임아웃으로 데드락 방지)
+                .setIfAbsent(lockKey, "locked", Duration.ofSeconds(10))
+                .flatMap(isLocked -> {
+                    if (Boolean.FALSE.equals(isLocked)) {
+                        // 락 획득 실패 시: 이미 다른 요청 처리 중
+                        log.warn("동일한 초대 수락 요청이 처리 중입니다: email={}", email);
+                        return Mono.empty();
+                    }
 
-            boolean isAlreadyMember = project.getMembers().stream()
-                    .anyMatch(m -> m.getUser().getId().equals(user.getId()));
+                    Mono<Void> businessLogic = Mono.fromRunnable(() -> transactionTemplate.executeWithoutResult(status -> {
+                                Project project = projectRepository.findByIdWithMembers(projectId)
+                                        .orElseThrow(() -> new CustomException(ErrorCode.PROJECT_NOT_FOUND));
 
-            if (isAlreadyMember) {
-                log.info("이미 멤버인 사용자: projectId={}, email={}", projectId, email);
-            } else {
-                ProjectMember newMember = ProjectMember.builder()
-                        .user(user)
-                        .project(project)
-                        .role(ProjectRole.MEMBER)
-                        .build();
-                project.addMember(newMember);
-                projectRepository.save(project);
-                log.info("신규 멤버 등록 성공: projectId={}, email={}", projectId, email);
-            }
-        })).subscribeOn(Schedulers.boundedElastic()).then();
+                                User user = userRepository.findByEmail(email)
+                                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+                                boolean isAlreadyMember = project.getMembers().stream()
+                                        .anyMatch(m -> m.getUser().getId().equals(user.getId()));
+
+                                if (isAlreadyMember) {
+                                    log.info("이미 멤버인 사용자: projectId={}, email={}", projectId, email);
+                                } else {
+                                    ProjectMember newMember = ProjectMember.builder()
+                                            .user(user)
+                                            .project(project)
+                                            .role(ProjectRole.MEMBER)
+                                            .build();
+                                    project.addMember(newMember);
+                                    projectRepository.save(project);
+                                    log.info("신규 멤버 등록 성공: projectId={}, email={}", projectId, email);
+                                }
+                            })).subscribeOn(Schedulers.boundedElastic()).then();
+
+                            return businessLogic
+                                .doFinally(signalType ->
+                                            redisTemplate.opsForValue().delete(lockKey).subscribe()
+                            );
+                })
+                .then();
     }
 
     /**
