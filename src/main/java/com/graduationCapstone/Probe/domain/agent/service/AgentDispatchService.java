@@ -1,9 +1,11 @@
 package com.graduationCapstone.Probe.domain.agent.service;
 
 import com.graduationCapstone.Probe.domain.project.entity.GithubRepository;
+import com.graduationCapstone.Probe.domain.project.entity.Scenario;
 import com.graduationCapstone.Probe.domain.project.entity.ScenarioGuide;
 import com.graduationCapstone.Probe.domain.project.repository.GithubRepositoryRepository;
 import com.graduationCapstone.Probe.domain.project.repository.ScenarioGuideRepository;
+import com.graduationCapstone.Probe.domain.project.repository.ScenarioRepository;
 import com.graduationCapstone.Probe.domain.test.entity.ExecutionStatus;
 import com.graduationCapstone.Probe.domain.test.entity.TestExecution;
 import com.graduationCapstone.Probe.domain.test.repository.TestExecutionRepository;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -27,30 +30,32 @@ public class AgentDispatchService {
     private final TestExecutionRepository testExecutionRepository;
     private final GithubRepositoryRepository githubRepositoryRepository;
     private final ScenarioGuideRepository scenarioGuideRepository;
+    private final ScenarioRepository scenarioRepository;
 
     @Value("${app.server.url}")
     private String serverUrl;
 
-    // FastAPI 엔드포인트 — 스펙 확정 시 수정
-    private static final String AI_EXECUTE_PATH = "/api/v1/test/execute";
+    private static final String AI_EXECUTE_PATH = "/api/generate-test";
 
     public AgentDispatchService(
             @Qualifier("aiWebClient") WebClient aiWebClient,
             TestExecutionRepository testExecutionRepository,
             GithubRepositoryRepository githubRepositoryRepository,
-            ScenarioGuideRepository scenarioGuideRepository
+            ScenarioGuideRepository scenarioGuideRepository,
+            ScenarioRepository scenarioRepository
     ) {
         this.aiWebClient = aiWebClient;
         this.testExecutionRepository = testExecutionRepository;
         this.githubRepositoryRepository = githubRepositoryRepository;
         this.scenarioGuideRepository = scenarioGuideRepository;
+        this.scenarioRepository = scenarioRepository;
     }
 
     /**
      * [동기] 존재 확인 및 유효성 검증을 수행하고 AI 요청 객체를 구성한 뒤,
      * 비동기 AI 서버 호출을 위임합니다.
-     *
-     * <p>이 메서드는 컨트롤러에서 동기적으로 호출되므로,
+     * <p>
+     * 이 메서드는 컨트롤러에서 동기적으로 호출되므로,
      * 검증 실패 시 CustomException이 그대로 전파되어 400/404 HTTP 응답이 반환됩니다.</p>
      *
      * @param executionId  테스트 실행 ID
@@ -70,37 +75,38 @@ public class AgentDispatchService {
         GithubRepository targetRepo = githubRepositoryRepository.findByProjectId(execution.getProjectId())
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
-        // 3. 시나리오 스텝 조회 → 비어 있으면 400
-        List<ScenarioGuide> steps = scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId);
+        // 3. Scenario (base_url, auth_token) 조회 → 없으면 404
+        Scenario scenario = scenarioRepository.findById(scenarioId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
+        // 4. 시나리오 스텝 조회 → 비어 있으면 400
+        List<ScenarioGuide> steps = scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId);
         if (steps.isEmpty()) {
             throw new CustomException(ErrorCode.INVALID_ARGUMENT);
         }
 
-        // 4. AI 요청 객체 구성
-        List<AiTestRequest.ScenarioStepDto> stepDtos = steps.stream()
-                .map(sg -> new AiTestRequest.ScenarioStepDto(
-                        sg.getStepOrder(),
-                        sg.getGuide().getTestItem()
-                ))
-                .toList();
+        // 5. requirement 문자열 조합 (stepOrder 순으로 정렬된 testItem을 \n으로 연결)
+        String requirement = steps.stream()
+                .map(sg -> sg.getGuide().getTestItem())
+                .collect(Collectors.joining("\n"));
 
         String callbackUrl = serverUrl + "/api/agent/callback";
 
         AiTestRequest request = new AiTestRequest(
                 executionId,
-                callbackUrl,
                 targetRepo.getRepoUrl(),
                 targetBranch,
-                stepDtos
+                requirement,
+                scenario.getAuthToken(),
+                callbackUrl
         );
 
-        // 5. 검증 통과 → AI 서버 호출만 비동기로 위임
+        // 6. 검증 통과 → AI 서버 호출만 비동기로 위임
         dispatchToAgent(executionId, request);
     }
 
     /**
-     * [비동기] 구성된 요청을 FastAPI AI 서버로 전송합니다.
+     * [비동기] 구성된 요청을 AI 서버로 전송합니다.
      *
      * <p>{@code validateAndPrepare()}에서 모든 검증이 완료된 후에만 호출되며,
      * HTTP 호출 자체만 별도 스레드에서 수행합니다.</p>

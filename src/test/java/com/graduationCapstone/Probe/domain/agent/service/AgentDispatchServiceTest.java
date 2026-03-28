@@ -2,9 +2,11 @@ package com.graduationCapstone.Probe.domain.agent.service;
 
 import com.graduationCapstone.Probe.domain.project.entity.GithubRepository;
 import com.graduationCapstone.Probe.domain.project.entity.Guide;
+import com.graduationCapstone.Probe.domain.project.entity.Scenario;
 import com.graduationCapstone.Probe.domain.project.entity.ScenarioGuide;
 import com.graduationCapstone.Probe.domain.project.repository.GithubRepositoryRepository;
 import com.graduationCapstone.Probe.domain.project.repository.ScenarioGuideRepository;
+import com.graduationCapstone.Probe.domain.project.repository.ScenarioRepository;
 import com.graduationCapstone.Probe.domain.test.entity.ExecutionStatus;
 import com.graduationCapstone.Probe.domain.test.entity.TestExecution;
 import com.graduationCapstone.Probe.domain.test.repository.TestExecutionRepository;
@@ -44,6 +46,8 @@ class AgentDispatchServiceTest {
     private GithubRepositoryRepository githubRepositoryRepository;
     @Mock
     private ScenarioGuideRepository scenarioGuideRepository;
+    @Mock
+    private ScenarioRepository scenarioRepository;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -59,11 +63,10 @@ class AgentDispatchServiceTest {
                 realWebClient,
                 testExecutionRepository,
                 githubRepositoryRepository,
-                scenarioGuideRepository
+                scenarioGuideRepository,
+                scenarioRepository
         );
 
-        // @Value 필드는 생성자에 없으므로 ReflectionTestUtils로 강제 주입
-        // MockWebServer의 baseUrl을 serverUrl로 설정하여 callbackUrl 생성 검증
         ReflectionTestUtils.setField(agentDispatchService, "serverUrl",
                 mockWebServer.url("").toString().replaceAll("/$", ""));
     }
@@ -77,7 +80,7 @@ class AgentDispatchServiceTest {
     // 1. 정상 dispatch — AI 서버로 올바른 JSON 전송
     // -------------------------------------------------------
     @Test
-    @DisplayName("정상적인 Dispatch 요청 시 FastAPI 규격에 맞는 JSON이 전송됨")
+    @DisplayName("정상적인 Dispatch 요청 시 AI 서버 규격에 맞는 JSON이 전송됨")
     void validateAndPrepare_success() throws InterruptedException {
         // given
         Long executionId = 1L;
@@ -96,6 +99,12 @@ class AgentDispatchServiceTest {
                 .build();
         given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
 
+        Scenario mockScenario = Scenario.builder()
+                .scenarioId(scenarioId)
+                .authToken("Bearer test-token-123")
+                .build();
+        given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
+
         Guide mockGuide = Guide.builder()
                 .testItem("로그인 버튼을 누른다")
                 .build();
@@ -106,9 +115,9 @@ class AgentDispatchServiceTest {
         given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
                 .willReturn(List.of(mockScenarioGuide));
 
-        mockWebServer.enqueue(new MockResponse().setResponseCode(200));
+        mockWebServer.enqueue(new MockResponse().setResponseCode(202));
 
-        // when — 동기 검증 통과 후 비동기 AI 호출 위임
+        // when
         agentDispatchService.validateAndPrepare(executionId, scenarioId, targetBranch);
 
         // then
@@ -118,21 +127,23 @@ class AgentDispatchServiceTest {
 
         // 1. URL 및 메서드 확인
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).isEqualTo("/api/v1/test/execute");
+        assertThat(request.getPath()).isEqualTo("/api/generate-test");
 
-        // 2. Body 내용 확인 (GitHub Dispatch 래핑 없이 AiTestRequest 직접 전송)
+        // 2. Body 내용 확인
         String body = request.getBody().readUtf8();
         assertThat(body).contains("\"execution_id\":1");
         assertThat(body).contains("\"callback_url\":");
         assertThat(body).contains("/api/agent/callback");
-        assertThat(body).contains("\"target_repo_url\":\"https://github.com/school/target-repo.git\"");
-        assertThat(body).contains("\"target_branch\":\"feature/login\"");
-        assertThat(body).contains("\"test_item\":\"로그인 버튼을 누른다\"");
-        assertThat(body).contains("\"step_order\":1");
+        assertThat(body).contains("\"repository_url\":\"https://github.com/school/target-repo.git\"");
+        assertThat(body).contains("\"branch\":\"feature/login\"");
+        assertThat(body).contains("\"requirement\":\"로그인 버튼을 누른다\"");
+        assertThat(body).contains("\"auth_token\":\"Bearer test-token-123\"");
 
-        // 3. 구 GitHub Dispatch 필드가 없는지 확인
-        assertThat(body).doesNotContain("event_type");
-        assertThat(body).doesNotContain("client_payload");
+        // 3. 제거된 필드가 없는지 확인
+        assertThat(body).doesNotContain("scenario_steps");
+        assertThat(body).doesNotContain("step_order");
+        assertThat(body).doesNotContain("target_repo_url");
+        assertThat(body).doesNotContain("target_branch");
     }
 
     // -------------------------------------------------------
@@ -145,7 +156,7 @@ class AgentDispatchServiceTest {
         Long nonExistentId = 999L;
         given(testExecutionRepository.findById(nonExistentId)).willReturn(Optional.empty());
 
-        // when & then — @Async 바깥(동기 구간)에서 예외 발생 → HTTP 404 반환 가능
+        // when & then
         assertThatThrownBy(() -> agentDispatchService.validateAndPrepare(nonExistentId, 1L, "main"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
@@ -153,7 +164,37 @@ class AgentDispatchServiceTest {
     }
 
     // -------------------------------------------------------
-    // 3. [동기 구간] 시나리오 스텝 없음 → 즉시 400 예외
+    // 3. [동기 구간] scenarioId 없음 → 즉시 404 예외
+    // -------------------------------------------------------
+    @Test
+    @DisplayName("존재하지 않는 scenarioId → RESOURCE_NOT_FOUND 예외가 동기적으로 발생")
+    void validateAndPrepare_scenarioNotFound_throwsImmediately() {
+        // given
+        Long executionId = 1L;
+        Long projectId = 100L;
+
+        TestExecution mockExecution = TestExecution.builder()
+                .executionId(executionId)
+                .projectId(projectId)
+                .build();
+        given(testExecutionRepository.findById(executionId)).willReturn(Optional.of(mockExecution));
+
+        GithubRepository mockRepo = GithubRepository.builder()
+                .repoUrl("https://github.com/school/target-repo.git")
+                .build();
+        given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
+
+        given(scenarioRepository.findById(1L)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> agentDispatchService.validateAndPrepare(executionId, 1L, "main"))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+    }
+
+    // -------------------------------------------------------
+    // 4. [동기 구간] 시나리오 스텝 없음 → 즉시 400 예외
     // -------------------------------------------------------
     @Test
     @DisplayName("시나리오 스텝이 없을 때 → INVALID_ARGUMENT 예외가 동기적으로 발생")
@@ -173,10 +214,16 @@ class AgentDispatchServiceTest {
                 .build();
         given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
 
-        given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(1L))
-                .willReturn(List.of()); // 스텝 없음
+        Scenario mockScenario = Scenario.builder()
+                .scenarioId(1L)
+                .authToken(null)
+                .build();
+        given(scenarioRepository.findById(1L)).willReturn(Optional.of(mockScenario));
 
-        // when & then — @Async 바깥(동기 구간)에서 예외 발생 → HTTP 400 반환 가능
+        given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(1L))
+                .willReturn(List.of());
+
+        // when & then
         assertThatThrownBy(() -> agentDispatchService.validateAndPrepare(executionId, 1L, "main"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
@@ -184,7 +231,7 @@ class AgentDispatchServiceTest {
     }
 
     // -------------------------------------------------------
-    // 4. [비동기 구간] AI 서버 500 에러 → TestExecution FAILED 업데이트
+    // 5. [비동기 구간] AI 서버 500 에러 → TestExecution FAILED 업데이트
     // -------------------------------------------------------
     @Test
     @DisplayName("AI 서버 호출 실패 시 TestExecution 상태가 FAILED로 업데이트됨")
@@ -207,22 +254,26 @@ class AgentDispatchServiceTest {
                 .build();
         given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
 
+        Scenario mockScenario = Scenario.builder()
+                .scenarioId(scenarioId)
+                .authToken(null)
+                .build();
+        given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
+
         Guide mockGuide = Guide.builder().testItem("회원가입 버튼 클릭").build();
         ScenarioGuide mockScenarioGuide = ScenarioGuide.builder().stepOrder(1).guide(mockGuide).build();
         given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
                 .willReturn(List.of(mockScenarioGuide));
 
-        // AI 서버가 500 에러를 반환하는 상황 시뮬레이션
         mockWebServer.enqueue(new MockResponse().setResponseCode(500).setBody("Internal Server Error"));
 
         // when
         agentDispatchService.validateAndPrepare(executionId, scenarioId, targetBranch);
 
-        // 비동기 처리 대기
         mockWebServer.takeRequest(5, TimeUnit.SECONDS);
         Thread.sleep(500);
 
-        // then: save가 호출됐는지 검증 (에러 핸들러 실행 확인)
+        // then
         org.mockito.Mockito.verify(testExecutionRepository, org.mockito.Mockito.atLeastOnce())
                 .save(mockExecution);
     }
