@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.test.StepVerifier;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -33,7 +34,7 @@ class GithubRepoServiceTest {
     void insertRepoTest() {
         // given
         User user = User.builder().id(1L).build();
-        GithubRepoSummaryDto dto = new GithubRepoSummaryDto("NewRepo", "owner", "description", "Java", 0, 0, 0);
+        GithubRepoSummaryDto dto = new GithubRepoSummaryDto("NewRepo", "owner", "description", "Java", 0, 0, 0, true, LocalDateTime.now());
 
         when(githubRepoRepository.findByUserIdAndRepoName(1L, "NewRepo")).thenReturn(Optional.empty());
 
@@ -43,6 +44,8 @@ class GithubRepoServiceTest {
             return GithubRepo.builder()
                     .id(200L) // 신규 생성된 ID 가정
                     .repoName(savedRepo.getRepoName())
+                    .isPublic(savedRepo.isPublic())
+                    .updatedAt(savedRepo.getUpdatedAt())
                     .user(user)
                     .build();
         });
@@ -63,8 +66,14 @@ class GithubRepoServiceTest {
     @DisplayName("레포지토리 저장 시 이미 존재하면 정보를 업데이트합니다.")
     void upsertRepoTest() {
         User user = User.builder().id(1L).build();
-        GithubRepoSummaryDto dto = new GithubRepoSummaryDto("Probe", "owner", "desc", "Java", 1, 1, 1);
-        GithubRepo existing = GithubRepo.builder().id(100L).repoName("Probe").user(user).build();
+        GithubRepoSummaryDto dto = new GithubRepoSummaryDto("Probe", "owner", "desc", "Java", 1, 1, 1, true, LocalDateTime.now());
+        GithubRepo existing = GithubRepo.builder()
+                .id(100L)
+                .repoName("Probe")
+                .isPublic(true)
+                .updatedAt(LocalDateTime.now().minusDays(1))
+                .user(user)
+                .build();
 
         when(githubRepoRepository.findByUserIdAndRepoName(1L, "Probe")).thenReturn(Optional.of(existing));
         when(githubRepoRepository.save(any())).thenReturn(existing);

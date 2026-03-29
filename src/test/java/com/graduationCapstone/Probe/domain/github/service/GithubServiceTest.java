@@ -1,5 +1,6 @@
 package com.graduationCapstone.Probe.domain.github.service;
 
+import com.graduationCapstone.Probe.domain.github.dto.GithubRepoSummaryDto;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.*;
@@ -33,11 +34,21 @@ class GithubServiceTest {
     void getRepoListTest() {
         mockWebServer.enqueue(new MockResponse()
                 .setHeader("Content-Type", "application/json")
-                .setBody("[{\"name\":\"Probe\", \"owner\":{\"login\":\"user\"}}]"));
+                .setBody("[{" +
+                        "\"name\":\"Probe\", " +
+                        "\"owner\":{\"login\":\"user\"}, " +
+                        "\"private\": false, " +
+                        "\"updated_at\": \"2024-03-29T10:00:00Z\"" +
+                        "}]"));
 
         githubService.getRepoList("token")
                 .as(StepVerifier::create)
-                .expectNextMatches(list -> list.getFirst().repoName().equals("Probe"))
+                .expectNextMatches(list -> {
+                    GithubRepoSummaryDto dto = list.getFirst();
+                    return dto.repoName().equals("Probe") &&
+                            dto.isPublic() &&
+                            dto.updatedAt() != null;
+                })
                 .verifyComplete();
     }
 
