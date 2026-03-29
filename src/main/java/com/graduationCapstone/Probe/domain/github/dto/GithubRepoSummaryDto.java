@@ -2,6 +2,8 @@ package com.graduationCapstone.Probe.domain.github.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.time.LocalDateTime;
+
 public record GithubRepoSummaryDto(
         @Schema(description = "레포지토리 이름", example = "Probe-Project", requiredMode = Schema.RequiredMode.REQUIRED)
         String repoName,
@@ -22,6 +24,12 @@ public record GithubRepoSummaryDto(
         int stargazersCount,
 
         @Schema(description = "오픈된 이슈 수")
-        int openIssuesCount
+        int openIssuesCount,
+
+        @Schema(description = "public, private 여부")
+        boolean isPublic,
+
+        @Schema(description = "업데이트 날짜")
+        LocalDateTime updatedAt
 ) {
 }
