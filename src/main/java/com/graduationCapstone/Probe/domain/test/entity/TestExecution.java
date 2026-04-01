@@ -42,19 +42,29 @@ public class TestExecution {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
-    @Column(name = "report_s3_url", length = 2048)
-    private String reportS3Url;
+    // 산출물 URL들
+    @Column(name = "plan_s3_url", length = 2048)
+    private String planS3Url;           // plan.xlsx
+
+    @Column(name = "plan_result_s3_url", length = 2048)
+    private String planResultS3Url;     // plan_result.xlsx
+
+    @Column(name = "test_spec_s3_url", length = 2048)
+    private String testSpecS3Url;       // test.spec.js
 
     /** 상태만 단순 변경 (예: FAILED 처리) */
     public void updateStatus(ExecutionStatus status) {
         this.status = status;
     }
 
-    /** 테스트 완료 처리: 상태, 소요 시간, 리포트 URL, 완료 시각을 한번에 갱신 */
-    public void complete(ExecutionStatus status, Long durationMs, String reportS3Url) {
+    /** 테스트 완료 처리: 상태, 소요 시간, 산출물 URL들, 완료 시각을 한번에 갱신 */
+    public void complete(ExecutionStatus status, Long durationMs,
+                         String planS3Url, String planResultS3Url, String testSpecS3Url) {
         this.status = status;
         this.durationMs = durationMs;
-        this.reportS3Url = reportS3Url;
+        this.planS3Url = planS3Url;
+        this.planResultS3Url = planResultS3Url;
+        this.testSpecS3Url = testSpecS3Url;
         this.completedAt = java.time.LocalDateTime.now();
     }
 }
