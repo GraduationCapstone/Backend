@@ -31,7 +31,8 @@ public class AgentCallbackService {
 
 
         // TestExecution 완료 처리
-        execution.complete(dto.status(), dto.durationMs(), dto.reportS3Url());
+        execution.complete(dto.status(), dto.durationMs(),
+                dto.planS3Url(), dto.planResultS3Url(), dto.testSpecS3Url());
         testExecutionRepository.save(execution);
 
         // 개별 TestResult 저장
@@ -42,7 +43,7 @@ public class AgentCallbackService {
                             .caseName(r.caseName())
                             .status(r.status())
                             .errorLog(r.errorLog())
-                            .screenshotS3Url(r.screenshotS3Url())
+                            .screenshotS3Urls(r.screenshotS3Urls())
                             .build())
                     .toList();
 

@@ -60,13 +60,17 @@ class AgentCallbackServiceTest {
                 executionId,
                 ExecutionStatus.COMPLETED,
                 3500L,
-                "https://s3.amazonaws.com/bucket/report.zip",
+                "https://s3.amazonaws.com/bucket/plan.xlsx",
+                "https://s3.amazonaws.com/bucket/plan_result.xlsx",
+                "https://s3.amazonaws.com/bucket/test.spec.js",
                 List.of(
                         new AgentCallbackRequestDto.TestResultDto(
-                                "로그인 성공 케이스", ResultStatus.SUCCESS, null, "https://s3.amazonaws.com/bucket/sc1.png"
+                                "로그인 성공 케이스", ResultStatus.SUCCESS, null,
+                                List.of("https://s3.amazonaws.com/bucket/sc1.png")
                         ),
                         new AgentCallbackRequestDto.TestResultDto(
-                                "잘못된 비밀번호 케이스", ResultStatus.FAIL, "AssertionError: 예상 오류 메시지와 다름", null
+                                "잘못된 비밀번호 케이스", ResultStatus.FAIL, "AssertionError: 예상 오류 메시지와 다름",
+                                List.of()
                         )
                 )
         );
@@ -77,7 +81,9 @@ class AgentCallbackServiceTest {
         // then — TestExecution 상태/완료 정보 업데이트 확인
         assertThat(execution.getStatus()).isEqualTo(ExecutionStatus.COMPLETED);
         assertThat(execution.getDurationMs()).isEqualTo(3500L);
-        assertThat(execution.getReportS3Url()).isEqualTo("https://s3.amazonaws.com/bucket/report.zip");
+        assertThat(execution.getPlanS3Url()).isEqualTo("https://s3.amazonaws.com/bucket/plan.xlsx");
+        assertThat(execution.getPlanResultS3Url()).isEqualTo("https://s3.amazonaws.com/bucket/plan_result.xlsx");
+        assertThat(execution.getTestSpecS3Url()).isEqualTo("https://s3.amazonaws.com/bucket/test.spec.js");
         assertThat(execution.getCompletedAt()).isNotNull();
         verify(testExecutionRepository).save(execution);
 
@@ -90,6 +96,7 @@ class AgentCallbackServiceTest {
         assertThat(savedResults).hasSize(2);
         assertThat(savedResults.get(0).getCaseName()).isEqualTo("로그인 성공 케이스");
         assertThat(savedResults.get(0).getStatus()).isEqualTo(ResultStatus.SUCCESS);
+        assertThat(savedResults.get(0).getScreenshotS3Urls()).containsExactly("https://s3.amazonaws.com/bucket/sc1.png");
         assertThat(savedResults.get(1).getCaseName()).isEqualTo("잘못된 비밀번호 케이스");
         assertThat(savedResults.get(1).getStatus()).isEqualTo(ResultStatus.FAIL);
         assertThat(savedResults.get(1).getErrorLog()).isEqualTo("AssertionError: 예상 오류 메시지와 다름");
@@ -116,7 +123,7 @@ class AgentCallbackServiceTest {
                 executionId,
                 ExecutionStatus.FAILED,
                 1200L,
-                null,
+                null, null, null,
                 List.of()
         );
 
@@ -141,7 +148,7 @@ class AgentCallbackServiceTest {
         given(testExecutionRepository.findById(nonExistentId)).willReturn(Optional.empty());
 
         AgentCallbackRequestDto dto = new AgentCallbackRequestDto(
-                nonExistentId, ExecutionStatus.COMPLETED, 1000L, null, List.of()
+                nonExistentId, ExecutionStatus.COMPLETED, 1000L, null, null, null, List.of()
         );
 
         // when & then

@@ -5,6 +5,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Getter
@@ -35,9 +36,11 @@ public class TestResult {
     @Column(name = "error_log", columnDefinition = "TEXT")
     private String errorLog;
 
-    // Playwright 스크린샷 S3 URL
+    // Playwright 스크린샷 S3 URL 목록
+    @ElementCollection
+    @CollectionTable(name = "test_result_screenshot", joinColumns = @JoinColumn(name = "result_id"))
     @Column(name = "screenshot_s3_url", length = 2048)
-    private String screenshotS3Url;
+    private List<String> screenshotS3Urls;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

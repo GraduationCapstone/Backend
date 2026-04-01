@@ -23,8 +23,15 @@ public record AgentCallbackRequestDto(
         @JsonProperty("duration_ms")
         Long durationMs,
 
-        @JsonProperty("report_s3_url")
-        String reportS3Url,
+        // 산출물 URL들
+        @JsonProperty("plan_s3_url")
+        String planS3Url,           // plan.xlsx
+
+        @JsonProperty("plan_result_s3_url")
+        String planResultS3Url,     // plan_result.xlsx
+
+        @JsonProperty("test_spec_s3_url")
+        String testSpecS3Url,       // test.spec.js
 
         @Valid
         List<TestResultDto> results
@@ -40,8 +47,9 @@ public record AgentCallbackRequestDto(
             @JsonProperty("error_log")
             String errorLog,
 
-            @JsonProperty("screenshot_s3_url")
-            String screenshotS3Url
+            // 스크린샷 여러 개 → 배열로
+            @JsonProperty("screenshot_s3_urls")
+            List<String> screenshotS3Urls
     ) {}
 }
 
