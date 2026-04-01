@@ -5,6 +5,8 @@ import com.graduationCapstone.Probe.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -39,6 +41,12 @@ public class GithubRepo {
     @Column(name = "repo_open_issues_count")
     private int openIssuesCount;
 
+    @Column(name = "repo_is_public", nullable = false)
+    private boolean isPublic;
+
+    @Column(name = "repo_updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
@@ -50,5 +58,7 @@ public class GithubRepo {
         this.forksCount = dto.forksCount();
         this.stargazersCount = dto.stargazersCount();
         this.openIssuesCount = dto.openIssuesCount();
+        this.isPublic = dto.isPublic();
+        this.updatedAt = dto.updatedAt();
     }
 }

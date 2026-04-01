@@ -6,6 +6,7 @@ import com.graduationCapstone.Probe.domain.github.repository.GithubRepoRepositor
 import com.graduationCapstone.Probe.domain.project.dto.*;
 import com.graduationCapstone.Probe.domain.project.entity.Project;
 import com.graduationCapstone.Probe.domain.project.entity.ProjectMember;
+import com.graduationCapstone.Probe.domain.project.entity.ProjectRepo;
 import com.graduationCapstone.Probe.domain.project.entity.ProjectRole;
 import com.graduationCapstone.Probe.domain.project.repository.ProjectMemberRepository;
 import com.graduationCapstone.Probe.domain.project.repository.ProjectRepoRepository;
@@ -34,6 +35,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -102,6 +105,9 @@ class ProjectServiceTest {
 
         given(redisTemplate.opsForValue()).willReturn(valueOperations);
         given(valueOperations.delete(anyString())).willReturn(Mono.just(true));
+
+        given(valueOperations.setIfAbsent(anyString(), anyString(), any(Duration.class)))
+                .willReturn(Mono.just(true));
 
         given(transactionTemplate.execute(any())).willAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
@@ -235,6 +241,8 @@ class ProjectServiceTest {
 
             StepVerifier.create(projectService.acceptInvitationByToken("token")).verifyComplete();
 
+            verify(valueOperations).setIfAbsent(contains("lock:project:join:"), anyString(), any(Duration.class));
+
             // 추가된 멤버의 권한이 MEMBER인지 검증
             ArgumentCaptor<Project> projectCaptor = ArgumentCaptor.forClass(Project.class);
             verify(projectRepository).save(projectCaptor.capture());
@@ -286,7 +294,7 @@ class ProjectServiceTest {
         void searchUsers_Success() {
             String keyword = "pRoBe";
             User other = User.builder().id(2L).username("other").email("o@o.com").build();
-            given(userRepository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(eq(keyword), eq(keyword)))
+            given(userRepository.findByUsernameContainingIgnoreCase(eq(keyword)))
                     .willReturn(List.of(testUser, other));
 
             StepVerifier.create(projectService.searchUsers(keyword, testUser))
@@ -296,7 +304,7 @@ class ProjectServiceTest {
                     })
                     .verifyComplete();
 
-            verify(userRepository).findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(eq(keyword), eq(keyword));
+            verify(userRepository).findByUsernameContainingIgnoreCase(eq(keyword));
         }
 
         @Test
@@ -342,9 +350,22 @@ class ProjectServiceTest {
         @Test
         @DisplayName("프로젝트 레포지토리 목록 조회")
         void getRepoList_Success() {
+            GithubRepo repo = GithubRepo.builder()
+                    .id(50L)
+                    .repoName("My Repo")
+                    .isPublic(true)
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            ProjectRepo pr = ProjectRepo.builder().githubRepo(repo).project(testProject).build();
+            testProject.addProjectRepo(pr);
+
             given(projectRepository.findByIdWithRepos(10L)).willReturn(Optional.of(testProject));
             StepVerifier.create(projectService.getProjectRepoList(10L))
-                    .assertNext(list -> assertThat(list).isNotNull())
+                    .assertNext(list -> {
+                        assertThat(list.get(0).repoName()).isEqualTo("My Repo");
+                        assertThat(list.get(0).isPublic()).isTrue();
+                        assertThat(list.get(0).updatedAt()).isNotNull();
+                    })
                     .verifyComplete();
 
             verify(transactionTemplate).execute(any());

@@ -80,7 +80,7 @@ public class GithubRepoService {
     private GithubRepoResponseDto mapToResponse(GithubRepo repo) {
         return new GithubRepoResponseDto(
                 repo.getId(), repo.getRepoName(), repo.getOwner(), repo.getDescription(),
-                repo.getLanguage(), repo.getForksCount(), repo.getStargazersCount(), repo.getOpenIssuesCount()
+                repo.getLanguage(), repo.getForksCount(), repo.getStargazersCount(), repo.getOpenIssuesCount(), repo.isPublic(), repo.getUpdatedAt()
         );
     }
 }

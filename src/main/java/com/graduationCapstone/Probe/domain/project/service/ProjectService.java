@@ -221,7 +221,7 @@ public class ProjectService {
     public Flux<UserSearchResponseDto> searchUsers(String keyword, User currentUser) {
         log.info("사용자 검색 시작: keyword={}, requester={}", keyword, currentUser.getUsername());
         return Mono.fromCallable(() -> {
-                    List<User> users = userRepository.findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(keyword, keyword)
+                    List<User> users = userRepository.findByUsernameContainingIgnoreCase(keyword)
                             .stream()
                             .filter(user -> !user.getId().equals(currentUser.getId()))
                             .toList();

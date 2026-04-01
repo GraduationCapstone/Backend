@@ -15,6 +15,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -50,15 +52,27 @@ public class GithubService {
                             log.error("GitHub API 인증 실패: 401 Unauthorized");
                             return Mono.error(new CustomException(ErrorCode.UNAUTHORIZED_ACCESS));})
                 .bodyToFlux(new ParameterizedTypeReference<Map<String, Object>>() {})
-                .map(repo -> new GithubRepoSummaryDto(
-                        (String) repo.get("name"),
-                        (String) ((Map<?, ?>) repo.get("owner")).get("login"),
-                        (String) repo.get("description"),
-                        (String) repo.get("language"),
-                        repo.get("forks_count") != null ? (int) repo.get("forks_count") : 0,
-                        repo.get("stargazers_count") != null ? (int) repo.get("stargazers_count") : 0,
-                        repo.get("open_issues_count") != null ? (int) repo.get("open_issues_count") : 0
-                ))
+                .map(repo -> {
+                    String updatedAtStr = (String) repo.get("updated_at");
+                    LocalDateTime updatedAt = (updatedAtStr != null)
+                            ? ZonedDateTime.parse(updatedAtStr).toLocalDateTime()
+                            : LocalDateTime.now();
+
+                    // GitHub API는 private이면 true를 반환하므로 반전(!) 처리
+                    boolean isPublic = repo.get("private") != null && !(boolean) repo.get("private");
+
+                    return new GithubRepoSummaryDto(
+                            (String) repo.get("name"),
+                            (String) ((Map<?, ?>) repo.get("owner")).get("login"),
+                            (String) repo.get("description"),
+                            (String) repo.get("language"),
+                            repo.get("forks_count") != null ? (int) repo.get("forks_count") : 0,
+                            repo.get("stargazers_count") != null ? (int) repo.get("stargazers_count") : 0,
+                            repo.get("open_issues_count") != null ? (int) repo.get("open_issues_count") : 0,
+                            isPublic,
+                            updatedAt
+                    );
+                })
                 .collectList()
                 .doOnSuccess(list -> log.info("GitHub 레포지토리 목록 조회 완료: count={}", list.size()))
                 .onErrorMap(e -> {
