@@ -1,5 +1,6 @@
 package com.graduationCapstone.Probe.domain.github.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -30,6 +31,8 @@ public record GithubRepoSummaryDto(
         boolean isPublic,
 
         @Schema(description = "업데이트 날짜")
+        // { 수정: 프론트엔드의 ISO 8601 형식을 LocalDateTime으로 파싱 }
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX")
         LocalDateTime updatedAt
 ) {
 }
