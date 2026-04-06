@@ -39,6 +39,7 @@ public class GithubRepoService {
                                 .repoName(dto.repoName()).owner(dto.owner()).description(dto.description())
                                 .language(dto.language()).forksCount(dto.forksCount())
                                 .stargazersCount(dto.stargazersCount()).openIssuesCount(dto.openIssuesCount())
+                                .isPublic(dto.isPublic()).updatedAt(dto.updatedAt())
                                 .user(user).build();
                     });
 
