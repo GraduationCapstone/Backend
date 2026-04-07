@@ -59,6 +59,6 @@ public class GithubRepo {
         this.stargazersCount = dto.stargazersCount();
         this.openIssuesCount = dto.openIssuesCount();
         this.isPublic = dto.isPublic();
-        this.updatedAt = dto.updatedAt();
+        this.updatedAt = dto.updatedAt().toLocalDateTime();
     }
 }
