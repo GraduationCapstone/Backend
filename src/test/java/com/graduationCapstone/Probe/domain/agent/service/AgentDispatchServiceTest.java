@@ -8,8 +8,11 @@ import com.graduationCapstone.Probe.domain.project.repository.GithubRepositoryRe
 import com.graduationCapstone.Probe.domain.project.repository.ScenarioGuideRepository;
 import com.graduationCapstone.Probe.domain.project.repository.ScenarioRepository;
 import com.graduationCapstone.Probe.domain.test.entity.ExecutionStatus;
+import com.graduationCapstone.Probe.domain.test.entity.ScenarioSequence;
 import com.graduationCapstone.Probe.domain.test.entity.TestExecution;
+import com.graduationCapstone.Probe.domain.test.repository.ScenarioSequenceRepository;
 import com.graduationCapstone.Probe.domain.test.repository.TestExecutionRepository;
+import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import com.graduationCapstone.Probe.global.exception.handler.CustomException;
 import okhttp3.mockwebserver.MockResponse;
@@ -18,8 +21,10 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -32,7 +37,9 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class AgentDispatchServiceTest {
@@ -48,6 +55,10 @@ class AgentDispatchServiceTest {
     private ScenarioGuideRepository scenarioGuideRepository;
     @Mock
     private ScenarioRepository scenarioRepository;
+    @Mock
+    private ScenarioSequenceRepository scenarioSequenceRepository;
+
+    private User testUser;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -64,11 +75,19 @@ class AgentDispatchServiceTest {
                 testExecutionRepository,
                 githubRepositoryRepository,
                 scenarioGuideRepository,
-                scenarioRepository
+                scenarioRepository,
+                scenarioSequenceRepository
         );
 
         ReflectionTestUtils.setField(agentDispatchService, "serverUrl",
                 mockWebServer.url("").toString().replaceAll("/$", ""));
+
+        testUser = User.builder()
+                .id(1L)
+                .githubId("12345")
+                .username("tester")
+                .email("tester@test.com")
+                .build();
     }
 
     @AfterEach
@@ -76,205 +95,305 @@ class AgentDispatchServiceTest {
         mockWebServer.shutdown();
     }
 
-    // -------------------------------------------------------
-    // 1. 정상 dispatch — AI 서버로 올바른 JSON 전송
-    // -------------------------------------------------------
-    @Test
-    @DisplayName("정상적인 Dispatch 요청 시 AI 서버 규격에 맞는 JSON이 전송됨")
-    void validateAndPrepare_success() throws InterruptedException {
-        // given
-        Long executionId = 1L;
-        Long scenarioId = 1L;
-        Long projectId = 100L;
-        String targetBranch = "feature/login";
+    // =======================================================
+    // 1단계: dispatchPlan
+    // =======================================================
+    @Nested
+    @DisplayName("1단계 - dispatchPlan")
+    class DispatchPlanTest {
 
-        TestExecution mockExecution = TestExecution.builder()
-                .executionId(executionId)
-                .projectId(projectId)
-                .build();
-        given(testExecutionRepository.findById(executionId)).willReturn(Optional.of(mockExecution));
+        @Test
+        @DisplayName("정상 계획서 생성 요청 시 TestExecution이 생성되고 AI 서버에 올바른 JSON 전송")
+        void dispatchPlan_success() throws InterruptedException {
+            // given
+            Long projectId = 100L;
+            Long scenarioId = 1L;
+            String testItem = "회원가입";
+            String targetBranch = "feature/login";
 
-        GithubRepository mockRepo = GithubRepository.builder()
-                .repoUrl("https://github.com/school/target-repo.git")
-                .build();
-        given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
+            // ScenarioSequence가 없는 경우 → 새로 생성
+            given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, "01"))
+                    .willReturn(Optional.empty());
 
-        Scenario mockScenario = Scenario.builder()
-                .scenarioId(scenarioId)
-                .authToken("Bearer test-token-123")
-                .build();
-        given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
+            ScenarioSequence newSequence = ScenarioSequence.builder()
+                    .projectId(projectId)
+                    .scenarioSerial("01")
+                    .build();
+            given(scenarioSequenceRepository.save(any(ScenarioSequence.class))).willReturn(newSequence);
 
-        Guide mockGuide = Guide.builder()
-                .testItem("로그인 버튼을 누른다")
-                .build();
-        ScenarioGuide mockScenarioGuide = ScenarioGuide.builder()
-                .stepOrder(1)
-                .guide(mockGuide)
-                .build();
-        given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
-                .willReturn(List.of(mockScenarioGuide));
+            // TestExecution 저장 시 executionId 반환
+            given(testExecutionRepository.save(any(TestExecution.class))).willAnswer(invocation -> {
+                TestExecution te = invocation.getArgument(0);
+                ReflectionTestUtils.setField(te, "executionId", 1L);
+                return te;
+            });
 
-        mockWebServer.enqueue(new MockResponse().setResponseCode(202));
+            GithubRepository mockRepo = GithubRepository.builder()
+                    .repoUrl("https://github.com/school/target-repo.git")
+                    .build();
+            given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
 
-        // when
-        agentDispatchService.validateAndPrepare(executionId, scenarioId, targetBranch);
+            Scenario mockScenario = Scenario.builder()
+                    .scenarioId(scenarioId)
+                    .authToken("Bearer test-token-123")
+                    .build();
+            given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
 
-        // then
-        RecordedRequest request = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
+            Guide mockGuide = Guide.builder().testItem("회원가입 버튼을 누른다").build();
+            ScenarioGuide mockScenarioGuide = ScenarioGuide.builder()
+                    .stepOrder(1)
+                    .guide(mockGuide)
+                    .build();
+            given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
+                    .willReturn(List.of(mockScenarioGuide));
 
-        assertThat(request).isNotNull();
+            mockWebServer.enqueue(new MockResponse().setResponseCode(202));
 
-        // 1. URL 및 메서드 확인
-        assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).isEqualTo("/api/generate-test");
+            // when
+            Long executionId = agentDispatchService.dispatchPlan(
+                    testUser, projectId, scenarioId, testItem, targetBranch);
 
-        // 2. Body 내용 확인
-        String body = request.getBody().readUtf8();
-        assertThat(body).contains("\"execution_id\":1");
-        assertThat(body).contains("\"callback_url\":");
-        assertThat(body).contains("/api/agent/callback");
-        assertThat(body).contains("\"repository_url\":\"https://github.com/school/target-repo.git\"");
-        assertThat(body).contains("\"branch\":\"feature/login\"");
-        assertThat(body).contains("\"requirement\":\"로그인 버튼을 누른다\"");
-        assertThat(body).contains("\"auth_token\":\"Bearer test-token-123\"");
+            // then — TestExecution 생성 확인
+            ArgumentCaptor<TestExecution> executionCaptor = ArgumentCaptor.forClass(TestExecution.class);
+            verify(testExecutionRepository).save(executionCaptor.capture());
+            TestExecution savedExecution = executionCaptor.getValue();
 
-        // 3. 제거된 필드가 없는지 확인
-        assertThat(body).doesNotContain("scenario_steps");
-        assertThat(body).doesNotContain("step_order");
-        assertThat(body).doesNotContain("target_repo_url");
-        assertThat(body).doesNotContain("target_branch");
+            assertThat(savedExecution.getProjectId()).isEqualTo(projectId);
+            assertThat(savedExecution.getTester()).isEqualTo(testUser);
+            assertThat(savedExecution.getTesterName()).isEqualTo("tester");
+            assertThat(savedExecution.getScenarioSerial()).isEqualTo("01");
+            assertThat(savedExecution.getScenarioAttempt()).isEqualTo(1);
+            assertThat(savedExecution.getTestName()).isEqualTo("회원가입");
+            assertThat(savedExecution.getStatus()).isEqualTo(ExecutionStatus.PLAN_GENERATING);
+
+            // AI 서버 요청 확인
+            RecordedRequest request = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
+            assertThat(request).isNotNull();
+            assertThat(request.getMethod()).isEqualTo("POST");
+            assertThat(request.getPath()).isEqualTo("/api/generate-plan");
+
+            String body = request.getBody().readUtf8();
+            assertThat(body).contains("\"execution_id\":1");
+            assertThat(body).contains("\"repository_url\":\"https://github.com/school/target-repo.git\"");
+            assertThat(body).contains("\"branch\":\"feature/login\"");
+            assertThat(body).contains("\"requirement\":\"회원가입 버튼을 누른다\"");
+            assertThat(body).contains("\"auth_token\":\"Bearer test-token-123\"");
+            assertThat(body).contains("/api/agent/callback/plan");
+            assertThat(body).contains("\"scenario_serial\":\"01\"");
+            assertThat(body).contains("\"scenario_attempt\":\"01\"");
+        }
+
+        @Test
+        @DisplayName("기존 ScenarioSequence가 있으면 attempt가 누적 증가함")
+        void dispatchPlan_existingSequence_incrementsAttempt() {
+            // given
+            Long projectId = 100L;
+            Long scenarioId = 1L;
+
+            ScenarioSequence existingSequence = ScenarioSequence.builder()
+                    .projectId(projectId)
+                    .scenarioSerial("01")
+                    .lastAttempt(3)
+                    .build();
+            given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, "01"))
+                    .willReturn(Optional.of(existingSequence));
+            given(scenarioSequenceRepository.save(any(ScenarioSequence.class))).willReturn(existingSequence);
+
+            given(testExecutionRepository.save(any(TestExecution.class))).willAnswer(invocation -> {
+                TestExecution te = invocation.getArgument(0);
+                ReflectionTestUtils.setField(te, "executionId", 1L);
+                return te;
+            });
+
+            GithubRepository mockRepo = GithubRepository.builder()
+                    .repoUrl("https://github.com/school/repo.git")
+                    .build();
+            given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
+
+            Scenario mockScenario = Scenario.builder().scenarioId(scenarioId).build();
+            given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
+
+            Guide mockGuide = Guide.builder().testItem("회원가입").build();
+            ScenarioGuide sg = ScenarioGuide.builder().stepOrder(1).guide(mockGuide).build();
+            given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
+                    .willReturn(List.of(sg));
+
+            mockWebServer.enqueue(new MockResponse().setResponseCode(202));
+
+            // when
+            agentDispatchService.dispatchPlan(testUser, projectId, scenarioId, "회원가입", "main");
+
+            // then — attempt가 4로 증가
+            ArgumentCaptor<TestExecution> captor = ArgumentCaptor.forClass(TestExecution.class);
+            verify(testExecutionRepository).save(captor.capture());
+            assertThat(captor.getValue().getScenarioAttempt()).isEqualTo(4);
+            assertThat(captor.getValue().getTestScenarioId()).isEqualTo("T0104");
+        }
+
+        @Test
+        @DisplayName("알 수 없는 testItem이면 IllegalArgumentException 발생")
+        void dispatchPlan_unknownTestItem_throwsException() {
+            // when & then
+            assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
+                    testUser, 100L, 1L, "존재하지 않는 시나리오", "main"))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("레포지토리가 없으면 RESOURCE_NOT_FOUND 예외 발생")
+        void dispatchPlan_repoNotFound_throwsException() {
+            // given
+            Long projectId = 100L;
+            Long scenarioId = 1L;
+
+            ScenarioSequence seq = ScenarioSequence.builder()
+                    .projectId(projectId).scenarioSerial("01").build();
+            given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, "01"))
+                    .willReturn(Optional.empty());
+            given(scenarioSequenceRepository.save(any(ScenarioSequence.class))).willReturn(seq);
+            given(testExecutionRepository.save(any(TestExecution.class))).willAnswer(invocation -> {
+                TestExecution te = invocation.getArgument(0);
+                ReflectionTestUtils.setField(te, "executionId", 1L);
+                return te;
+            });
+            given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
+                    testUser, projectId, scenarioId, "회원가입", "main"))
+                    .isInstanceOf(CustomException.class)
+                    .extracting(e -> ((CustomException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("시나리오 스텝이 없으면 INVALID_ARGUMENT 예외 발생")
+        void dispatchPlan_emptySteps_throwsException() {
+            // given
+            Long projectId = 100L;
+            Long scenarioId = 1L;
+
+            ScenarioSequence seq = ScenarioSequence.builder()
+                    .projectId(projectId).scenarioSerial("01").build();
+            given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, "01"))
+                    .willReturn(Optional.empty());
+            given(scenarioSequenceRepository.save(any(ScenarioSequence.class))).willReturn(seq);
+            given(testExecutionRepository.save(any(TestExecution.class))).willAnswer(invocation -> {
+                TestExecution te = invocation.getArgument(0);
+                ReflectionTestUtils.setField(te, "executionId", 1L);
+                return te;
+            });
+
+            GithubRepository mockRepo = GithubRepository.builder()
+                    .repoUrl("https://github.com/school/repo.git").build();
+            given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
+
+            Scenario mockScenario = Scenario.builder().scenarioId(scenarioId).build();
+            given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
+
+            given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
+                    .willReturn(List.of());
+
+            // when & then
+            assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
+                    testUser, projectId, scenarioId, "회원가입", "main"))
+                    .isInstanceOf(CustomException.class)
+                    .extracting(e -> ((CustomException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_ARGUMENT);
+        }
     }
 
-    // -------------------------------------------------------
-    // 2. [동기 구간] executionId 없음 → 즉시 404 예외
-    // -------------------------------------------------------
-    @Test
-    @DisplayName("존재하지 않는 executionId → RESOURCE_NOT_FOUND 예외가 동기적으로 발생")
-    void validateAndPrepare_executionNotFound_throwsImmediately() {
-        // given
-        Long nonExistentId = 999L;
-        given(testExecutionRepository.findById(nonExistentId)).willReturn(Optional.empty());
+    // =======================================================
+    // 2단계: dispatchTest
+    // =======================================================
+    @Nested
+    @DisplayName("2단계 - dispatchTest")
+    class DispatchTestTest {
 
-        // when & then
-        assertThatThrownBy(() -> agentDispatchService.validateAndPrepare(nonExistentId, 1L, "main"))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
-    }
+        @Test
+        @DisplayName("PLAN_COMPLETED 상태에서 테스트 실행 요청 시 상태가 TESTING으로 변경되고 AI 서버에 요청 전송")
+        void dispatchTest_success() throws InterruptedException {
+            // given
+            Long executionId = 1L;
+            User tester = User.builder()
+                    .id(1L).githubId("12345").username("tester").email("tester@test.com").build();
 
-    // -------------------------------------------------------
-    // 3. [동기 구간] scenarioId 없음 → 즉시 404 예외
-    // -------------------------------------------------------
-    @Test
-    @DisplayName("존재하지 않는 scenarioId → RESOURCE_NOT_FOUND 예외가 동기적으로 발생")
-    void validateAndPrepare_scenarioNotFound_throwsImmediately() {
-        // given
-        Long executionId = 1L;
-        Long projectId = 100L;
+            TestExecution execution = TestExecution.builder()
+                    .executionId(executionId)
+                    .projectId(100L)
+                    .tester(tester)
+                    .testerName("tester")
+                    .scenarioSerial("01")
+                    .scenarioAttempt(1)
+                    .testName("회원가입")
+                    .status(ExecutionStatus.PLAN_COMPLETED)
+                    .build();
+            given(testExecutionRepository.findActiveById(executionId)).willReturn(Optional.of(execution));
 
-        TestExecution mockExecution = TestExecution.builder()
-                .executionId(executionId)
-                .projectId(projectId)
-                .build();
-        given(testExecutionRepository.findById(executionId)).willReturn(Optional.of(mockExecution));
+            GithubRepository mockRepo = GithubRepository.builder()
+                    .repoUrl("https://github.com/school/target-repo.git").build();
+            given(githubRepositoryRepository.findByProjectId(100L)).willReturn(Optional.of(mockRepo));
 
-        GithubRepository mockRepo = GithubRepository.builder()
-                .repoUrl("https://github.com/school/target-repo.git")
-                .build();
-        given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
+            mockWebServer.enqueue(new MockResponse().setResponseCode(202));
 
-        given(scenarioRepository.findById(1L)).willReturn(Optional.empty());
+            // when
+            agentDispatchService.dispatchTest(executionId);
 
-        // when & then
-        assertThatThrownBy(() -> agentDispatchService.validateAndPrepare(executionId, 1L, "main"))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
-    }
+            // then
+            assertThat(execution.getStatus()).isEqualTo(ExecutionStatus.TESTING);
+            verify(testExecutionRepository).save(execution);
 
-    // -------------------------------------------------------
-    // 4. [동기 구간] 시나리오 스텝 없음 → 즉시 400 예외
-    // -------------------------------------------------------
-    @Test
-    @DisplayName("시나리오 스텝이 없을 때 → INVALID_ARGUMENT 예외가 동기적으로 발생")
-    void validateAndPrepare_emptyScenarioSteps_throwsImmediately() {
-        // given
-        Long executionId = 1L;
-        Long projectId = 100L;
+            RecordedRequest request = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
+            assertThat(request).isNotNull();
+            assertThat(request.getMethod()).isEqualTo("POST");
+            assertThat(request.getPath()).isEqualTo("/api/execute-test");
 
-        TestExecution mockExecution = TestExecution.builder()
-                .executionId(executionId)
-                .projectId(projectId)
-                .build();
-        given(testExecutionRepository.findById(executionId)).willReturn(Optional.of(mockExecution));
+            String body = request.getBody().readUtf8();
+            assertThat(body).contains("\"execution_id\":1");
+            assertThat(body).contains("/api/agent/callback/test");
+            assertThat(body).contains("\"scenario_serial\":\"01\"");
+            assertThat(body).contains("\"scenario_attempt\":\"01\"");
+        }
 
-        GithubRepository mockRepo = GithubRepository.builder()
-                .repoUrl("https://github.com/school/target-repo.git")
-                .build();
-        given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
+        @Test
+        @DisplayName("PLAN_COMPLETED가 아닌 상태에서 테스트 실행 요청 시 INVALID_ARGUMENT 예외 발생")
+        void dispatchTest_notPlanCompleted_throwsException() {
+            // given
+            Long executionId = 1L;
+            User tester = User.builder()
+                    .id(1L).githubId("12345").username("tester").email("tester@test.com").build();
 
-        Scenario mockScenario = Scenario.builder()
-                .scenarioId(1L)
-                .authToken(null)
-                .build();
-        given(scenarioRepository.findById(1L)).willReturn(Optional.of(mockScenario));
+            TestExecution execution = TestExecution.builder()
+                    .executionId(executionId)
+                    .projectId(100L)
+                    .tester(tester)
+                    .testerName("tester")
+                    .scenarioSerial("01")
+                    .scenarioAttempt(1)
+                    .testName("회원가입")
+                    .status(ExecutionStatus.PLAN_GENERATING)
+                    .build();
+            given(testExecutionRepository.findActiveById(executionId)).willReturn(Optional.of(execution));
 
-        given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(1L))
-                .willReturn(List.of());
+            // when & then
+            assertThatThrownBy(() -> agentDispatchService.dispatchTest(executionId))
+                    .isInstanceOf(CustomException.class)
+                    .extracting(e -> ((CustomException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.INVALID_ARGUMENT);
+        }
 
-        // when & then
-        assertThatThrownBy(() -> agentDispatchService.validateAndPrepare(executionId, 1L, "main"))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.INVALID_ARGUMENT);
-    }
+        @Test
+        @DisplayName("존재하지 않는 executionId로 테스트 실행 요청 시 RESOURCE_NOT_FOUND 예외 발생")
+        void dispatchTest_executionNotFound_throwsException() {
+            // given
+            Long nonExistentId = 999L;
+            given(testExecutionRepository.findActiveById(nonExistentId)).willReturn(Optional.empty());
 
-    // -------------------------------------------------------
-    // 5. [비동기 구간] AI 서버 500 에러 → TestExecution FAILED 업데이트
-    // -------------------------------------------------------
-    @Test
-    @DisplayName("AI 서버 호출 실패 시 TestExecution 상태가 FAILED로 업데이트됨")
-    void validateAndPrepare_aiServerError_updatesStatusToFailed() throws InterruptedException {
-        // given
-        Long executionId = 2L;
-        Long scenarioId = 1L;
-        Long projectId = 200L;
-        String targetBranch = "main";
-
-        TestExecution mockExecution = TestExecution.builder()
-                .executionId(executionId)
-                .projectId(projectId)
-                .status(ExecutionStatus.PENDING)
-                .build();
-        given(testExecutionRepository.findById(executionId)).willReturn(Optional.of(mockExecution));
-
-        GithubRepository mockRepo = GithubRepository.builder()
-                .repoUrl("https://github.com/school/target-repo.git")
-                .build();
-        given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
-
-        Scenario mockScenario = Scenario.builder()
-                .scenarioId(scenarioId)
-                .authToken(null)
-                .build();
-        given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
-
-        Guide mockGuide = Guide.builder().testItem("회원가입 버튼 클릭").build();
-        ScenarioGuide mockScenarioGuide = ScenarioGuide.builder().stepOrder(1).guide(mockGuide).build();
-        given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
-                .willReturn(List.of(mockScenarioGuide));
-
-        mockWebServer.enqueue(new MockResponse().setResponseCode(500).setBody("Internal Server Error"));
-
-        // when
-        agentDispatchService.validateAndPrepare(executionId, scenarioId, targetBranch);
-
-        mockWebServer.takeRequest(5, TimeUnit.SECONDS);
-        Thread.sleep(500);
-
-        // then
-        org.mockito.Mockito.verify(testExecutionRepository, org.mockito.Mockito.atLeastOnce())
-                .save(mockExecution);
+            // when & then
+            assertThatThrownBy(() -> agentDispatchService.dispatchTest(nonExistentId))
+                    .isInstanceOf(CustomException.class)
+                    .extracting(e -> ((CustomException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
+        }
     }
 }
