@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.test.StepVerifier;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -34,7 +35,7 @@ class GithubRepoServiceTest {
     void insertRepoTest() {
         // given
         User user = User.builder().id(1L).build();
-        GithubRepoSummaryDto dto = new GithubRepoSummaryDto("NewRepo", "owner", "description", "Java", 0, 0, 0, true, LocalDateTime.now());
+        GithubRepoSummaryDto dto = new GithubRepoSummaryDto("NewRepo", "owner", "description", "Java", 0, 0, 0, true, OffsetDateTime.now());
 
         when(githubRepoRepository.findByUserIdAndRepoName(1L, "NewRepo")).thenReturn(Optional.empty());
 
@@ -53,9 +54,7 @@ class GithubRepoServiceTest {
         // when & then
         githubRepoService.upsertRepo(user, dto)
                 .as(StepVerifier::create)
-                .expectNextMatches(res -> {
-                    return res.id().equals(200L) && res.repoName().equals("NewRepo");
-                })
+                .expectNextMatches(res -> res.id().equals(200L) && res.repoName().equals("NewRepo") && res.isPublic() == true)
                 .verifyComplete();
 
         // 실제로 save 메서드가 한 번 호출되었는지 검증
@@ -66,7 +65,7 @@ class GithubRepoServiceTest {
     @DisplayName("레포지토리 저장 시 이미 존재하면 정보를 업데이트합니다.")
     void upsertRepoTest() {
         User user = User.builder().id(1L).build();
-        GithubRepoSummaryDto dto = new GithubRepoSummaryDto("Probe", "owner", "desc", "Java", 1, 1, 1, true, LocalDateTime.now());
+        GithubRepoSummaryDto dto = new GithubRepoSummaryDto("Probe", "owner", "desc", "Java", 1, 1, 1, true, OffsetDateTime.now());
         GithubRepo existing = GithubRepo.builder()
                 .id(100L)
                 .repoName("Probe")

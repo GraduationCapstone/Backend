@@ -3,7 +3,8 @@ package com.graduationCapstone.Probe.domain.github.dto;
 import com.graduationCapstone.Probe.domain.github.entity.GithubRepo;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 @Schema(description = "GitHub 레포지토리 정보 응답 DTO")
 public record GithubRepoResponseDto(
@@ -35,7 +36,7 @@ public record GithubRepoResponseDto(
         boolean isPublic,
 
         @Schema(description = "업데이트 날짜")
-        LocalDateTime updatedAt
+        OffsetDateTime updatedAt
 ) {
     public static GithubRepoResponseDto from(GithubRepo repo) {
         return new GithubRepoResponseDto(
@@ -48,7 +49,7 @@ public record GithubRepoResponseDto(
                 repo.getStargazersCount(),
                 repo.getOpenIssuesCount(),
                 repo.isPublic(),
-                repo.getUpdatedAt()
+                repo.getUpdatedAt().atOffset(ZoneOffset.UTC)
         );
     }
 }

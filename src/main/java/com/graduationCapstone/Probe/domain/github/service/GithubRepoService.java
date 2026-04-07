@@ -39,7 +39,7 @@ public class GithubRepoService {
                                 .repoName(dto.repoName()).owner(dto.owner()).description(dto.description())
                                 .language(dto.language()).forksCount(dto.forksCount())
                                 .stargazersCount(dto.stargazersCount()).openIssuesCount(dto.openIssuesCount())
-                                .isPublic(dto.isPublic()).updatedAt(dto.updatedAt())
+                                .isPublic(dto.isPublic()).updatedAt(dto.updatedAt().toLocalDateTime())
                                 .user(user).build();
                     });
 
@@ -79,9 +79,6 @@ public class GithubRepoService {
     }
 
     private GithubRepoResponseDto mapToResponse(GithubRepo repo) {
-        return new GithubRepoResponseDto(
-                repo.getId(), repo.getRepoName(), repo.getOwner(), repo.getDescription(),
-                repo.getLanguage(), repo.getForksCount(), repo.getStargazersCount(), repo.getOpenIssuesCount(), repo.isPublic(), repo.getUpdatedAt()
-        );
+        return GithubRepoResponseDto.from(repo); //변환 로직 일원화
     }
 }

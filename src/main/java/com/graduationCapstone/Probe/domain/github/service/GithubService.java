@@ -15,8 +15,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -54,9 +53,9 @@ public class GithubService {
                 .bodyToFlux(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .map(repo -> {
                     String updatedAtStr = (String) repo.get("updated_at");
-                    LocalDateTime updatedAt = (updatedAtStr != null)
-                            ? ZonedDateTime.parse(updatedAtStr).toLocalDateTime()
-                            : LocalDateTime.now();
+                    OffsetDateTime updatedAt = (updatedAtStr != null)
+                            ? OffsetDateTime.parse(updatedAtStr)
+                            : OffsetDateTime.now();
 
                     // GitHub API는 private이면 true를 반환하므로 반전(!) 처리
                     boolean isPublic = repo.get("private") != null && !(boolean) repo.get("private");

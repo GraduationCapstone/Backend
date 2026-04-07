@@ -26,6 +26,7 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -212,7 +213,7 @@ class ProjectControllerTest {
         @Test
         @DisplayName("프로젝트 레포지토리 목록 조회")
         void getProjectRepos_Success() throws Exception {
-            GithubRepoResponseDto repo = new GithubRepoResponseDto(100L, "repo", "MAKC", "desc", "Java", 0, 0, 0);
+            GithubRepoResponseDto repo = new GithubRepoResponseDto(100L, "repo", "MAKC", "desc", "Java", 0, 0, 0, true, OffsetDateTime.now());
             given(projectService.getProjectRepoList(10L)).willReturn(Mono.just(List.of(repo)));
 
             MvcResult result = mockMvc.perform(get("/api/projects/10/repos").with(authentication(auth)))
@@ -220,7 +221,9 @@ class ProjectControllerTest {
 
             mockMvc.perform(asyncDispatch(result))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[0].repoName").value("repo"));
+                    .andExpect(jsonPath("$[0].repoName").value("repo"))
+                    .andExpect(jsonPath("$[0].isPublic").value(true))
+                    .andExpect(jsonPath("$[0].updatedAt").exists());
         }
     }
 
