@@ -223,7 +223,7 @@ class ProjectControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].repoName").value("repo"))
                     .andExpect(jsonPath("$[0].isPublic").value(true))
-                    .andExpect(jsonPath("$[0].updatedAt").exists());;
+                    .andExpect(jsonPath("$[0].updatedAt").exists());
         }
     }
 
