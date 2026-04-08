@@ -137,7 +137,7 @@ class ProjectControllerTest {
         @DisplayName("초대 수락 - 성공 HTML 반환")
         void acceptInvitation_Success() throws Exception {
             given(projectService.acceptInvitationByToken(anyString())).willReturn(Mono.empty());
-            given(templateEngine.process(eq("project/accept-success"), any())).willReturn("<html>Success</html>");
+            given(templateEngine.process(eq("mail/accept-success"), any())).willReturn("<html>Success</html>");
 
             MvcResult result = mockMvc.perform(get("/api/projects/accept")
                             .param("token", "valid-token")
@@ -154,7 +154,7 @@ class ProjectControllerTest {
         @DisplayName("초대 수락 - 실패 HTML 반환")
         void acceptInvitation_Fail() throws Exception {
             given(projectService.acceptInvitationByToken(anyString())).willReturn(Mono.error(new RuntimeException()));
-            given(templateEngine.process(eq("project/accept-failure"), any())).willReturn("<html>Fail</html>");
+            given(templateEngine.process(eq("mail/accept-failure"), any())).willReturn("<html>Fail</html>");
 
             MvcResult result = mockMvc.perform(get("/api/projects/accept")
                             .param("token", "expired")
