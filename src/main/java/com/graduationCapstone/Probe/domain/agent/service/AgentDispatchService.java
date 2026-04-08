@@ -88,7 +88,6 @@ public class AgentDispatchService {
                                 .build()
                 ));
         int attempt = sequence.nextAttempt();
-        scenarioSequenceRepository.save(sequence);
 
         // 3. TestExecution 생성
         TestExecution execution = TestExecution.builder()
@@ -159,9 +158,8 @@ public class AgentDispatchService {
             throw new CustomException(ErrorCode.INVALID_ARGUMENT);
         }
 
-        // 상태 변경: TESTING
+        // 상태 변경: TESTING (dirty checking으로 트랜잭션 커밋 시 자동 반영)
         execution.updateStatus(ExecutionStatus.TESTING);
-        testExecutionRepository.save(execution);
 
         // 레포지토리 URL 조회
         GithubRepository targetRepo = githubRepositoryRepository.findByProjectId(execution.getProjectId())
