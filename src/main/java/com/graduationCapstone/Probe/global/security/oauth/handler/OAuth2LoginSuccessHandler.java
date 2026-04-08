@@ -17,6 +17,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.net.URI;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -27,9 +29,9 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
     private final RefreshTokenService refreshTokenService;
     private final CookieUtil cookieUtil;
 
-    // 프론트엔드 URL로 토큰을 담아 리다이렉트
+    // 프론트엔드 URL로 토큰을 담아 리다이렉트 (콤마로 여러 URL 지정 가능)
     @Value("${oauth2.frontend-redirect-url}")
-    private String FRONTEND_REDIRECT_URL;
+    private List<String> frontendRedirectUrls;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
@@ -48,10 +50,27 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
         cookieUtil.addAccessCookie(response, accessToken);
 
-        String targetUrl = UriComponentsBuilder.fromUriString(FRONTEND_REDIRECT_URL)
+        String targetUrl = UriComponentsBuilder.fromUriString(resolveRedirectUrl(request))
                 .queryParam("access_token", accessToken)
                 .build().toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
+    }
+
+    private String resolveRedirectUrl(HttpServletRequest request) {
+        String referer = request.getHeader("Referer");
+        if (referer != null) {
+            for (String url : frontendRedirectUrls) {
+                try {
+                    URI redirectUri = URI.create(url.trim());
+                    String origin = redirectUri.getScheme() + "://" + redirectUri.getAuthority();
+                    if (referer.startsWith(origin)) {
+                        return url.trim();
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+        return frontendRedirectUrls.get(0).trim();
     }
 }
