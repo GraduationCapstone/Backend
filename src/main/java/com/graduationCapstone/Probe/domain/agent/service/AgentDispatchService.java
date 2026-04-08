@@ -6,9 +6,10 @@ import com.graduationCapstone.Probe.domain.project.entity.ScenarioGuide;
 import com.graduationCapstone.Probe.domain.project.repository.GithubRepositoryRepository;
 import com.graduationCapstone.Probe.domain.project.repository.ScenarioGuideRepository;
 import com.graduationCapstone.Probe.domain.project.repository.ScenarioRepository;
-import com.graduationCapstone.Probe.domain.test.entity.ExecutionStatus;
-import com.graduationCapstone.Probe.domain.test.entity.TestExecution;
+import com.graduationCapstone.Probe.domain.test.entity.*;
+import com.graduationCapstone.Probe.domain.test.repository.ScenarioSequenceRepository;
 import com.graduationCapstone.Probe.domain.test.repository.TestExecutionRepository;
+import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import com.graduationCapstone.Probe.global.exception.handler.CustomException;
 import com.graduationCapstone.Probe.infrastructure.ai.dto.AiTestRequest;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
@@ -31,92 +33,164 @@ public class AgentDispatchService {
     private final GithubRepositoryRepository githubRepositoryRepository;
     private final ScenarioGuideRepository scenarioGuideRepository;
     private final ScenarioRepository scenarioRepository;
+    private final ScenarioSequenceRepository scenarioSequenceRepository;
 
     @Value("${app.server.url}")
     private String serverUrl;
 
-    private static final String AI_EXECUTE_PATH = "/api/generate-test";
+    private static final String AI_PLAN_PATH = "/api/generate-plan";
+    private static final String AI_TEST_PATH = "/api/execute-test";
 
     public AgentDispatchService(
             @Qualifier("aiWebClient") WebClient aiWebClient,
             TestExecutionRepository testExecutionRepository,
             GithubRepositoryRepository githubRepositoryRepository,
             ScenarioGuideRepository scenarioGuideRepository,
-            ScenarioRepository scenarioRepository
+            ScenarioRepository scenarioRepository,
+            ScenarioSequenceRepository scenarioSequenceRepository
     ) {
         this.aiWebClient = aiWebClient;
         this.testExecutionRepository = testExecutionRepository;
         this.githubRepositoryRepository = githubRepositoryRepository;
         this.scenarioGuideRepository = scenarioGuideRepository;
         this.scenarioRepository = scenarioRepository;
+        this.scenarioSequenceRepository = scenarioSequenceRepository;
     }
 
     /**
-     * [동기] 존재 확인 및 유효성 검증을 수행하고 AI 요청 객체를 구성한 뒤,
-     * 비동기 AI 서버 호출을 위임합니다.
-     * <p>
-     * 이 메서드는 컨트롤러에서 동기적으로 호출되므로,
-     * 검증 실패 시 CustomException이 그대로 전파되어 400/404 HTTP 응답이 반환됩니다.</p>
+     * 1단계: 테스트 계획서 생성 요청.
      *
-     * @param executionId  테스트 실행 ID
+     * <p>TestExecution을 생성하고 SCENARIO_SERIAL/ATTEMPT를 발급한 뒤,
+     * AI 서버에 계획서 생성을 비동기로 요청합니다.</p>
+     *
+     * @param user         현재 인증된 사용자
+     * @param projectId    프로젝트 ID
      * @param scenarioId   시나리오 ID
+     * @param testItem     시나리오 가이드 이름 (예: "회원가입")
      * @param targetBranch 테스트 대상 브랜치
+     * @return 생성된 TestExecution의 ID
      */
-    public void validateAndPrepare(Long executionId, Long scenarioId, String targetBranch) {
-        log.info("Validating dispatch request. ExecutionId={}, ScenarioId={}", executionId, scenarioId);
+    @Transactional
+    public Long dispatchPlan(User user, Long projectId, Long scenarioId,
+                             String testItem, String targetBranch) {
+        log.info("Dispatching plan. ProjectId={}, TestItem={}", projectId, testItem);
 
-        // 1. 테스트 실행 정보 존재 확인 → 없으면 404
-        TestExecution execution = testExecutionRepository.findById(executionId)
+        // 1. 시나리오 시리얼 조회
+        ScenarioSerial serial = ScenarioSerial.fromTestItem(testItem);
+
+        // 2. SCENARIO_ATTEMPT 발급 (동시성 제어)
+        ScenarioSequence sequence = scenarioSequenceRepository
+                .findByProjectIdAndScenarioSerialForUpdate(projectId, serial.getCode())
+                .orElseGet(() -> scenarioSequenceRepository.save(
+                        ScenarioSequence.builder()
+                                .projectId(projectId)
+                                .scenarioSerial(serial.getCode())
+                                .build()
+                ));
+        int attempt = sequence.nextAttempt();
+
+        // 3. TestExecution 생성
+        TestExecution execution = TestExecution.builder()
+                .projectId(projectId)
+                .tester(user)
+                .testerName(user.getUsername())
+                .scenarioSerial(serial.getCode())
+                .scenarioAttempt(attempt)
+                .testName(testItem)
+                .status(ExecutionStatus.PLAN_GENERATING)
+                .build();
+        testExecutionRepository.save(execution);
+
+        log.info("TestExecution created. Id={}, ScenarioId={}", execution.getExecutionId(), execution.getTestScenarioId());
+
+        // 4. 레포지토리 URL 조회
+        GithubRepository targetRepo = githubRepositoryRepository.findByProjectId(projectId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
-        log.info("Execution found. ProjectId={}", execution.getProjectId());
-
-        // 2. 연결된 레포지토리 URL 조회 → 없으면 404
-        GithubRepository targetRepo = githubRepositoryRepository.findByProjectId(execution.getProjectId())
-                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-
-        // 3. Scenario (base_url, auth_token) 조회 → 없으면 404
+        // 5. Scenario (auth_token) 조회
         Scenario scenario = scenarioRepository.findById(scenarioId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
-        // 4. 시나리오 스텝 조회 → 비어 있으면 400
+        // 6. 시나리오 스텝에서 requirement 구성
         List<ScenarioGuide> steps = scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId);
         if (steps.isEmpty()) {
             throw new CustomException(ErrorCode.INVALID_ARGUMENT);
         }
 
-        // 5. requirement 문자열 조합 (stepOrder 순으로 정렬된 testItem을 \n으로 연결)
         String requirement = steps.stream()
                 .map(sg -> sg.getGuide().getTestItem())
                 .collect(Collectors.joining("\n"));
 
-        String callbackUrl = serverUrl + "/api/agent/callback";
+        String callbackUrl = serverUrl + "/api/agent/callback/plan";
 
         AiTestRequest request = new AiTestRequest(
-                executionId,
+                execution.getExecutionId(),
                 targetRepo.getRepoUrl(),
                 targetBranch,
                 requirement,
                 scenario.getAuthToken(),
-                callbackUrl
+                callbackUrl,
+                serial.getCode(),
+                String.format("%02d", attempt)
         );
 
-        // 6. 검증 통과 → AI 서버 호출만 비동기로 위임
-        dispatchToAgent(executionId, request);
+        // 7. AI 서버 호출 (비동기)
+        dispatchToAi(execution.getExecutionId(), request, AI_PLAN_PATH);
+
+        return execution.getExecutionId();
     }
 
     /**
-     * [비동기] 구성된 요청을 AI 서버로 전송합니다.
+     * 2단계: 테스트 실행 요청.
      *
-     * <p>{@code validateAndPrepare()}에서 모든 검증이 완료된 후에만 호출되며,
-     * HTTP 호출 자체만 별도 스레드에서 수행합니다.</p>
+     * <p>PLAN_COMPLETED 상태의 TestExecution에 대해 테스트 실행을 요청합니다.</p>
+     *
+     * @param executionId 테스트 실행 ID
+     */
+    @Transactional
+    public void dispatchTest(Long executionId) {
+        log.info("Dispatching test execution. ExecutionId={}", executionId);
+
+        TestExecution execution = testExecutionRepository.findActiveById(executionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (execution.getStatus() != ExecutionStatus.PLAN_COMPLETED) {
+            throw new CustomException(ErrorCode.INVALID_ARGUMENT);
+        }
+
+        // 상태 변경: TESTING (dirty checking으로 트랜잭션 커밋 시 자동 반영)
+        execution.updateStatus(ExecutionStatus.TESTING);
+
+        // 레포지토리 URL 조회
+        GithubRepository targetRepo = githubRepositoryRepository.findByProjectId(execution.getProjectId())
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        String callbackUrl = serverUrl + "/api/agent/callback/test";
+
+        AiTestRequest request = new AiTestRequest(
+                executionId,
+                targetRepo.getRepoUrl(),
+                null,   // branch는 이미 AI 서버가 알고 있음 (계획서 생성 시 전달됨)
+                null,   // requirement도 동일
+                null,   // authToken도 동일
+                callbackUrl,
+                execution.getScenarioSerial(),
+                String.format("%02d", execution.getScenarioAttempt())
+        );
+
+        // AI 서버 호출 (비동기)
+        dispatchToAi(executionId, request, AI_TEST_PATH);
+    }
+
+    /**
+     * AI 서버로 요청을 비동기 전송합니다.
      */
     @Async("agentExecutor")
-    public void dispatchToAgent(Long executionId, AiTestRequest request) {
-        log.info("Dispatching to AI server. ExecutionId={}", executionId);
+    public void dispatchToAi(Long executionId, AiTestRequest request, String path) {
+        log.info("Dispatching to AI server. ExecutionId={}, Path={}", executionId, path);
 
         aiWebClient.post()
-                .uri(AI_EXECUTE_PATH)
+                .uri(path)
                 .bodyValue(request)
                 .retrieve()
                 .toBodilessEntity()
@@ -125,7 +199,6 @@ public class AgentDispatchService {
                                 executionId, response.getStatusCode()),
                         error -> {
                             log.error("AI server dispatch failed. ExecutionId={}", executionId, error);
-                            // 호출 실패 시 TestExecution 상태를 FAILED로 업데이트
                             testExecutionRepository.findById(executionId).ifPresent(exec -> {
                                 exec.updateStatus(ExecutionStatus.FAILED);
                                 testExecutionRepository.save(exec);

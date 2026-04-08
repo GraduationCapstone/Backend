@@ -1,7 +1,9 @@
 package com.graduationCapstone.Probe.domain.agent.controller;
 
-import com.graduationCapstone.Probe.domain.agent.dto.AgentTriggerRequestDto;
+import com.graduationCapstone.Probe.domain.agent.dto.AgentPlanTriggerRequestDto;
+import com.graduationCapstone.Probe.domain.agent.dto.AgentTestTriggerRequestDto;
 import com.graduationCapstone.Probe.domain.agent.service.AgentDispatchService;
+import com.graduationCapstone.Probe.domain.user.entity.User;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -9,10 +11,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @Tag(
         name = "AI 에이전트 (Agent)",
@@ -26,30 +31,45 @@ public class AgentController {
     private final AgentDispatchService agentDispatchService;
 
     @Operation(
-            summary = "테스트 실행 트리거 (Dispatch)",
-            description = "FastAPI AI 서버에게 테스트 시작 명령을 비동기로 전송합니다."
+            summary = "1단계: 테스트 계획서 생성 트리거",
+            description = "AI 서버에 테스트 계획서 생성을 비동기로 요청합니다. " +
+                    "TestExecution을 생성하고 SCENARIO_SERIAL/ATTEMPT를 발급합니다."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "202", description = "명령 전송 요청 접수됨 (비동기 처리 시작)"),
+            @ApiResponse(responseCode = "202", description = "계획서 생성 요청 접수됨"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 인자"),
-            @ApiResponse(responseCode = "404", description = "해당 실행 정보나 레포지토리를 찾을 수 없음")
+            @ApiResponse(responseCode = "404", description = "프로젝트 또는 시나리오를 찾을 수 없음")
     })
-    @PostMapping("/dispatch")
-    public ResponseEntity<Void> triggerAgent(
-            @Valid
-            @RequestBody
-            AgentTriggerRequestDto requestDto
+    @PostMapping("/dispatch/plan")
+    public ResponseEntity<Map<String, Long>> triggerPlanGeneration(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody AgentPlanTriggerRequestDto requestDto
     ) {
-
-        // 동기 구간: 존재 확인·유효성 검증 → 실패 시 400/404 즉시 반환
-        // 검증 통과 후 AI 서버 호출은 내부에서 비동기(@Async)로 위임됨
-        agentDispatchService.validateAndPrepare(
-                requestDto.executionId(),
+        Long executionId = agentDispatchService.dispatchPlan(
+                user,
+                requestDto.projectId(),
                 requestDto.scenarioId(),
+                requestDto.testItem(),
                 requestDto.targetBranch()
         );
 
-        // 비동기 요청이므로 Accepted(202) 상태 코드를 반환
+        return ResponseEntity.accepted().body(Map.of("executionId", executionId));
+    }
+
+    @Operation(
+            summary = "2단계: 테스트 실행 트리거",
+            description = "PLAN_COMPLETED 상태의 TestExecution에 대해 테스트 실행을 비동기로 요청합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "202", description = "테스트 실행 요청 접수됨"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청 인자 또는 계획서 미완료 상태"),
+            @ApiResponse(responseCode = "404", description = "해당 실행 정보를 찾을 수 없음")
+    })
+    @PostMapping("/dispatch/test")
+    public ResponseEntity<Void> triggerTestExecution(
+            @Valid @RequestBody AgentTestTriggerRequestDto requestDto
+    ) {
+        agentDispatchService.dispatchTest(requestDto.executionId());
         return ResponseEntity.accepted().build();
     }
 }

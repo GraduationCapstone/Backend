@@ -3,8 +3,7 @@ package com.graduationCapstone.Probe.infrastructure.ai.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * AI 서버로 테스트 생성을 요청할 때 사용하는 DTO.
- * 엔드포인트: POST /api/generate-test
+ * AI 서버로 테스트 생성/실행을 요청할 때 사용하는 DTO.
  */
 public record AiTestRequest(
 
@@ -24,6 +23,12 @@ public record AiTestRequest(
         String authToken,
 
         @JsonProperty("callback_url")
-        String callbackUrl
+        String callbackUrl,
+
+        @JsonProperty("scenario_serial")
+        String scenarioSerial,
+
+        @JsonProperty("scenario_attempt")
+        String scenarioAttempt
 ) {
 }
