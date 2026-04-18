@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Getter
@@ -19,6 +20,13 @@ public class TestExecution {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "execution_id")
     private Long executionId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id")
+    private TestGroup testGroup; // 부모 연결
+
+    @OneToMany(mappedBy = "testExecution", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<TestResult> testResults;
 
     @Column(name = "project_id", nullable = false)
     private Long projectId;
@@ -135,5 +143,11 @@ public class TestExecution {
     /** 테스트명(코드명) 수정 */
     public void updateTestName(String testName) {
         this.testName = testName;
+    }
+
+    /** 테스트그룹명 수정 **/
+    public void updateGroupAndName(TestGroup group, String name) {
+        this.testGroup = group;
+        this.testName = name;
     }
 }

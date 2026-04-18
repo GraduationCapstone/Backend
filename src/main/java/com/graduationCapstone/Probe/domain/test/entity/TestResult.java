@@ -22,8 +22,9 @@ public class TestResult {
     @Column(name = "result_id")
     private Long resultId;
 
-    @Column(name = "execution_id", nullable = false)
-    private Long executionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "execution_id")
+    private TestExecution testExecution; //부모 연결
 
     // ── ID 구성 요소 ──
 
@@ -100,5 +101,10 @@ public class TestResult {
     /** 테스트 코드명 수정 */
     public void updateTestCodeName(String testCodeName) {
         this.testCodeName = testCodeName;
+    }
+
+    /** 테스트케이스ID 반환 */
+    public String getFullTestCaseId() {
+        return String.format("%s_%s", testExecution.getTestScenarioId(), this.testCaseNumber);
     }
 }
