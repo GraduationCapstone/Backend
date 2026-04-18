@@ -4,6 +4,7 @@ import com.graduationCapstone.Probe.domain.agent.dto.AgentPlanTriggerRequestDto;
 import com.graduationCapstone.Probe.domain.agent.dto.AgentTestTriggerRequestDto;
 import com.graduationCapstone.Probe.domain.agent.service.AgentDispatchService;
 import com.graduationCapstone.Probe.domain.user.entity.User;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -40,6 +41,7 @@ public class AgentController {
             @ApiResponse(responseCode = "400", description = "잘못된 요청 인자"),
             @ApiResponse(responseCode = "404", description = "프로젝트 또는 시나리오를 찾을 수 없음")
     })
+    @Hidden
     @PostMapping("/dispatch/plan")
     public ResponseEntity<Map<String, Long>> triggerPlanGeneration(
             @AuthenticationPrincipal User user,
