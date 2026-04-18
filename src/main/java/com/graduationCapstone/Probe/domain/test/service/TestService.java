@@ -1,0 +1,234 @@
+package com.graduationCapstone.Probe.domain.test.service;
+
+import com.graduationCapstone.Probe.domain.agent.service.AgentDispatchService;
+import com.graduationCapstone.Probe.domain.test.dto.*;
+import com.graduationCapstone.Probe.domain.test.entity.*;
+import com.graduationCapstone.Probe.domain.test.repository.*;
+import com.graduationCapstone.Probe.domain.user.entity.User;
+import com.graduationCapstone.Probe.global.exception.ErrorCode;
+import com.graduationCapstone.Probe.global.exception.handler.CustomException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class TestService {
+
+    private final TestGroupRepository groupRepo;
+    private final TestExecutionRepository executionRepo;
+    private final TestResultRepository resultRepo;
+    private final AgentDispatchService agentDispatchService;
+
+    /**
+     * 사용자가 입력한 그룹명으로 바구니를 만들고, 에이전트에게 개별 테스트 생성을 위임합니다.
+     * 시나리오가 1개여도 동일한 '그룹화' 과정을 거칩니다.
+     */
+    @Transactional
+    public void createTestEntities(User user, Long projectId, TestGroupCreateRequestDto dto) {
+        log.info("[FLOW] 테스트 그룹 생성 및 실행 시작 - ProjectID: {}, Group: {}", projectId, dto.baseTestGroupName());
+
+        // 사용자가 입력한 그룹명으로 TestGroup을 먼저 저장합니다.
+        TestGroup group = groupRepo.save(TestGroup.builder()
+                .projectId(projectId)
+                .groupName(dto.baseTestGroupName())
+                .targetRepoId(dto.targetRepoId())
+                .targetBranch(dto.targetBranch())
+                .build());
+
+        // 선택된 시나리오 리스트를 순회하며 에이전트에게 생성/발송을 요청합니다.
+        for (Long sId : dto.scenarioIds()) {
+            ScenarioSerial serialInfo = ScenarioSerial.values()[sId.intValue() - 1];
+
+            // AgentDispatchService가 스스로 TestExecution을 생성하고 AI에 요청을 보냅니다.
+            // 여기서는 그 결과로 만들어진 ID만 받습니다. (시퀀스 중복 방지)
+            Long executionId = agentDispatchService.dispatchPlan(
+                    user,
+                    projectId,
+                    sId,
+                    serialInfo.getTestItem(),
+                    dto.targetBranch()
+            );
+
+            // 에이전트가 만든 실행 엔티티를 찾아 그룹과 이름을 동기화합니다.
+            TestExecution execution = executionRepo.findById(executionId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+            // 테스트 그룹 엔티티와 그룹명 스냅샷을 강제로 주입하여 교정합니다.
+            execution.updateGroupAndName(group, group.getGroupName());
+
+            log.info("[FLOW] 에이전트 요청 완료 및 후처리 성공 - ExecutionID: {}, Scenario: {}",
+                    executionId, serialInfo.getTestItem());
+        }
+        log.info("[FLOW] 모든 시나리오에 대한 그룹 테스트 요청 완료");
+    }
+
+    /**
+     * 테스트 그룹명을 수정하고, 해당 그룹에 속한 모든 테스트 코드(Execution)의 testName 스냅샷을 동기화합니다.
+     */
+    @Transactional
+    public void updateGroupName(Long projectId, Long groupId, String newName) {
+        log.info("[UPDATE] 테스트 그룹명 수정 요청 - GroupID: {}, NewName: {}", groupId, newName);
+
+        TestGroup group = groupRepo.findById(groupId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!group.getProjectId().equals(projectId)) {
+            log.warn("[SECURITY] 권한 없는 프로젝트 테스트 그룹 수정 시도 - ProjectID: {}, GroupID: {}", projectId, groupId);
+            throw new CustomException(ErrorCode.INVALID_ARGUMENT);
+        }
+
+        group.updateGroupName(newName);
+
+        // 하위 모든 테스트 코드의 testName(스냅샷)을 새 그룹명으로 일괄 변경
+        List<TestExecution> executions = executionRepo.findAllByTestGroup_GroupId((groupId));
+        for (TestExecution exec : executions) {
+            exec.updateTestName(newName);
+        }
+
+        log.info("[UPDATE] 테스트 그룹 및 하위 테스트 코드명 수정 완료 - Affected Count: {}", executions.size());
+    }
+
+    /**
+     * 테스트 그룹을 삭제합니다.
+     */
+    @Transactional
+    public void deleteGroup(Long projectId, Long groupId) {
+        log.info("[DELETE] 테스트 그룹 삭제 요청 - GroupID: {}", groupId);
+
+        TestGroup group = groupRepo.findById(groupId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!group.getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.INVALID_ARGUMENT);
+        }
+
+        groupRepo.delete(group);
+        log.info("[DELETE] 테스트 그룹 삭제 완료 - GroupID: {}", groupId);
+    }
+
+    /**
+     * 프로젝트 내 테스트 그룹 이름 중복 여부를 확인합니다.
+     */
+    @Transactional(readOnly = true)
+    public boolean isGroupNameDuplicate(Long projectId, String groupName) {
+        return groupRepo.existsByProjectIdAndGroupName(projectId, groupName);
+    }
+
+    /**
+     * 기본 목록 조회 및 정렬
+     */
+    @Transactional(readOnly = true)
+    public List<TestExecutionListDto> getBasicSortedList(Long projectId, String field, boolean ascending) {
+        log.info("[LIST] 기본 목록 조회 - Field: {}, Asc: {}", field, ascending);
+        return executionRepo.findAllActiveByProjectId(projectId, field, ascending).stream()
+                .map(e -> new TestExecutionListDto(
+                        e.getTestScenarioId(),
+                        e.getTestName(),
+                        e.getStatus().name(),
+                        formatDuration(e.getDurationSeconds()),
+                        e.getTesterName(),
+                        e.getCompletedAt()
+                )).toList();
+    }
+
+    /**
+     * 정렬 기준에 따라 테스트 요약 목록을 조회합니다.
+     */
+    @Transactional(readOnly = true)
+    public List<TestCaseSummaryDto> getTestSummaryList(Long projectId, String sortField, boolean ascending) {
+        log.info("[LIST] 요약 목록 조회 - Sort: {}", sortField);
+        return executionRepo.findAllActiveByProjectId(projectId, sortField, ascending).stream()
+                .flatMap(exec -> exec.getTestResults().stream()
+                        .filter(res -> res.getDeletedAt() == null)
+                        .map(res -> {
+                            PassRateResponseDto stats = getPassRateStats(exec.getExecutionId());
+                            return new TestCaseSummaryDto(
+                                    res.getFullTestCaseId(),
+                                    exec.getTestGroup().getGroupName(),
+                                    stats.passRatio(),
+                                    formatDuration(res.getDurationSeconds()),
+                                    exec.getTesterName(),
+                                    exec.getCompletedAt()
+                            );
+                        })
+                ).toList();
+    }
+
+    /**
+     * 프로젝트 전체의 테스트 통과 비율을 조회합니다.
+     */
+    @Transactional(readOnly = true)
+    public PassRateResponseDto getProjectGlobalStats(Long projectId) {
+        Map<ResultStatus, Long> counts = resultRepo.countByStatusForProject(projectId);
+        long pass = counts.getOrDefault(ResultStatus.PASS, 0L);
+        long total = counts.values().stream().mapToLong(l -> l).sum();
+
+        String countString = pass + "/" + total;
+        return new PassRateResponseDto(pass, total, countString, calculateRatio(pass, total));
+    }
+
+    /**
+     * 특정 테스트 코드(Execution)의 통과 비율을 계산합니다.
+     */
+    @Transactional(readOnly = true)
+    public PassRateResponseDto getPassRateStats(Long executionId) {
+        Map<ResultStatus, Long> counts = resultRepo.countByStatusForExecution(executionId);
+        long pass = counts.getOrDefault(ResultStatus.PASS, 0L);
+        long total = counts.values().stream().mapToLong(l -> l).sum();
+
+        String countString = pass + "/" + total;
+        return new PassRateResponseDto(pass, total, countString, calculateRatio(pass, total));
+    }
+
+    /**
+     * 통과된 테스트의 비율을 소수점 첫째 자리까지 계산하여 문자열로 반환합니다.
+     */
+    public String calculateRatio(long pass, long total) {
+        if (total == 0) return "0.0%";
+        double ratio = (double) pass / total * 100;
+        return String.format("%.1f%%", Math.round(ratio * 10.0) / 10.0);
+    }
+
+    /**
+     * 소요 시간(초)을 문자열로 변환합니다.
+     */
+    public String formatDuration(Double sec) {
+        if (sec == null || sec == 0) return "0s";
+        int totalSec = sec.intValue();
+        int minutes = totalSec / 60;
+        int seconds = totalSec % 60;
+        return (minutes == 0) ? seconds + "s" : String.format("%dm %ds", minutes, seconds);
+    }
+
+    /**
+     * 날짜별 평균 테스트 시간 조회
+     */
+    @Transactional(readOnly = true)
+    public List<DailyAvgDurationResponseDto> getDailyAvgDurations(Long projectId) {
+        return executionRepo.findDailyAvgDuration(projectId).stream()
+                .map(t -> new DailyAvgDurationResponseDto(t.get(0, String.class), formatDuration(t.get(1, Double.class))))
+                .toList();
+    }
+
+    /**
+     * 프로젝트 내의 테스트 케이스(Execution) 총 개수 조회
+     */
+    @Transactional(readOnly = true)
+    public long countTotalExecutions(Long projectId) {
+        return executionRepo.countByProjectId(projectId);
+    }
+
+    /**
+     * 특정 테스트 그룹에 포함된 모든 하위 결과의 총 개수 집계
+     */
+    @Transactional(readOnly = true)
+    public long countResultsInGroup(Long groupId) {
+        return resultRepo.countByTestExecution_TestGroup_GroupId(groupId);
+    }
+}
