@@ -1,6 +1,7 @@
 package com.graduationCapstone.Probe.domain.test.repository;
 
 import com.graduationCapstone.Probe.domain.test.entity.TestExecution;
+import com.querydsl.core.Tuple;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,4 +13,7 @@ public interface TestExecutionRepositoryCustom {
 
     /** Soft Delete 필터링된 단건 조회 */
     Optional<TestExecution> findActiveById(Long executionId);
+
+    /** 통계 정보 **/
+    List<Tuple> findDailyAvgDuration(Long projectId);
 }

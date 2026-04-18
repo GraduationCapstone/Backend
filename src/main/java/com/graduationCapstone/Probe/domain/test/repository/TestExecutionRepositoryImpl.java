@@ -1,7 +1,9 @@
 package com.graduationCapstone.Probe.domain.test.repository;
 
+import com.graduationCapstone.Probe.domain.test.entity.ExecutionStatus;
 import com.graduationCapstone.Probe.domain.test.entity.QTestExecution;
 import com.graduationCapstone.Probe.domain.test.entity.TestExecution;
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.ComparableExpressionBase;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -40,6 +42,15 @@ public class TestExecutionRepositoryImpl implements TestExecutionRepositoryCusto
                 )
                 .fetchOne();
         return Optional.ofNullable(result);
+    }
+
+    @Override
+    public List<Tuple> findDailyAvgDuration(Long projectId) {
+        return queryFactory.select(te.completedAt.stringValue().substring(0, 10), te.durationSeconds.avg())
+                .from(te)
+                .where(te.projectId.eq(projectId), te.status.eq(ExecutionStatus.COMPLETED))
+                .groupBy(te.completedAt.stringValue().substring(0, 10))
+                .fetch();
     }
 
     private OrderSpecifier<?> buildOrderSpecifier(String sortField, boolean ascending) {

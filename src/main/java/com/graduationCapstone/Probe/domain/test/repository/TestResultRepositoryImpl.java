@@ -29,7 +29,7 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
         return queryFactory
                 .selectFrom(tr)
                 .where(
-                        tr.executionId.eq(executionId),
+                        tr.testExecution.executionId.eq(executionId),
                         tr.deletedAt.isNull()
                 )
                 .orderBy(buildOrderSpecifier(sortField, ascending))
@@ -53,7 +53,7 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
         List<Tuple> tuples = queryFactory
                 .select(tr.status, tr.count())
                 .from(tr)
-                .join(te).on(tr.executionId.eq(te.executionId))
+                .join(te).on(tr.testExecution.executionId.eq(te.executionId))
                 .where(
                         te.projectId.eq(projectId),
                         te.deletedAt.isNull(),
@@ -71,7 +71,7 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
                 .select(tr.status, tr.count())
                 .from(tr)
                 .where(
-                        tr.executionId.eq(executionId),
+                        tr.testExecution.executionId.eq(executionId),
                         tr.deletedAt.isNull()
                 )
                 .groupBy(tr.status)
