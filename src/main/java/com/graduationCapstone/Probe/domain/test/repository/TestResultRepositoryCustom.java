@@ -20,4 +20,7 @@ public interface TestResultRepositoryCustom {
 
     /** 특정 execution의 상태별 테스트 결과 개수 */
     Map<ResultStatus, Long> countByStatusForExecution(Long executionId);
+
+    /** 여러 Execution ID들에 대한 상태별 카운트를 한 번에 조회 */
+    Map<Long, Map<ResultStatus, Long>> findCountsByExecutionIds(List<Long> executionIds);
 }

@@ -4,5 +4,5 @@ import com.graduationCapstone.Probe.domain.test.entity.TestResult;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TestResultRepository extends JpaRepository<TestResult, Long>, TestResultRepositoryCustom {
-    long countByTestExecution_TestGroup_GroupId(Long groupId);
+    long countByTestExecution_TestGroup_GroupIdAndDeletedAtIsNull(Long groupId);
 }

@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
@@ -15,6 +17,8 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "test_result")
+@SQLDelete(sql = "UPDATE test_result SET deleted_at = NOW() WHERE result_id = ?")
+@Where(clause = "deleted_at IS NULL")
 public class TestResult {
 
     @Id
@@ -23,7 +27,7 @@ public class TestResult {
     private Long resultId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "execution_id")
+    @JoinColumn(name = "execution_id", nullable = false)
     private TestExecution testExecution; //부모 연결
 
     // ── ID 구성 요소 ──

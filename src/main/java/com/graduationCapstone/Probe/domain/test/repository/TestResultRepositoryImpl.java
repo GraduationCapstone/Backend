@@ -1,9 +1,6 @@
 package com.graduationCapstone.Probe.domain.test.repository;
 
-import com.graduationCapstone.Probe.domain.test.entity.QTestExecution;
-import com.graduationCapstone.Probe.domain.test.entity.QTestResult;
-import com.graduationCapstone.Probe.domain.test.entity.ResultStatus;
-import com.graduationCapstone.Probe.domain.test.entity.TestResult;
+import com.graduationCapstone.Probe.domain.test.entity.*;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.ComparableExpressionBase;
@@ -11,10 +8,8 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -23,13 +18,16 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
     private final JPAQueryFactory queryFactory;
     private static final QTestResult tr = QTestResult.testResult;
     private static final QTestExecution te = QTestExecution.testExecution;
+    private static final QTestGroup tg = QTestGroup.testGroup;
 
     @Override
     public List<TestResult> findAllActiveByExecutionId(Long executionId, String sortField, boolean ascending) {
         return queryFactory
                 .selectFrom(tr)
+                .join(tr.testExecution, te).fetchJoin() // 부모 실행 정보도 함께 로드
                 .where(
                         tr.testExecution.executionId.eq(executionId),
+                        te.deletedAt.isNull(), // 부모가 삭제되었을 시 결과도 노출 X
                         tr.deletedAt.isNull()
                 )
                 .orderBy(buildOrderSpecifier(sortField, ascending))
@@ -42,7 +40,8 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
                 .selectFrom(tr)
                 .where(
                         tr.resultId.eq(resultId),
-                        tr.deletedAt.isNull()
+                        tr.deletedAt.isNull(),
+                        te.deletedAt.isNull() // 부모가 삭제된 경우 조회 X
                 )
                 .fetchOne();
         return Optional.ofNullable(result);
@@ -72,12 +71,41 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
                 .from(tr)
                 .where(
                         tr.testExecution.executionId.eq(executionId),
+                        te.deletedAt.isNull(),
                         tr.deletedAt.isNull()
                 )
                 .groupBy(tr.status)
                 .fetch();
 
         return toStatusMap(tuples);
+    }
+
+    @Override
+    public Map<Long, Map<ResultStatus, Long>> findCountsByExecutionIds(List<Long> executionIds) {
+        if (executionIds == null || executionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        // executionId와 status별로 그룹화하여 카운트 조회
+        List<Tuple> results = queryFactory
+                .select(tr.testExecution.executionId, tr.status, tr.count())
+                .from(tr)
+                .where(
+                        tr.testExecution.executionId.in(executionIds),
+                        tr.deletedAt.isNull() // Soft Delete 필터링
+                )
+                .groupBy(tr.testExecution.executionId, tr.status)
+                .fetch();
+
+        // 결과를 Map<Long, Map<ResultStatus, Long>> 형태로 변환
+        // 예: {1L: {PASS: 10, FAIL: 2}, 2L: {PASS: 5, BLOCK: 1}}
+        return results.stream().collect(Collectors.groupingBy(
+                t -> t.get(tr.testExecution.executionId),
+                Collectors.toMap(
+                        t -> t.get(tr.status),
+                        t -> t.get(tr.count())
+                )
+        ));
     }
 
     private Map<ResultStatus, Long> toStatusMap(List<Tuple> tuples) {

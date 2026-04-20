@@ -4,6 +4,8 @@ import com.graduationCapstone.Probe.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,6 +16,8 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "test_execution")
+@SQLDelete(sql = "UPDATE test_execution SET deleted_at = NOW() WHERE execution_id = ?")
+@Where(clause = "deleted_at IS NULL")
 public class TestExecution {
 
     @Id

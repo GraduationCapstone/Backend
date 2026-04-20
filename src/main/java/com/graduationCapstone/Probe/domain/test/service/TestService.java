@@ -43,7 +43,7 @@ public class TestService {
 
         // 선택된 시나리오 리스트를 순회하며 에이전트에게 생성/발송을 요청합니다.
         for (Long sId : dto.scenarioIds()) {
-            ScenarioSerial serialInfo = ScenarioSerial.values()[sId.intValue() - 1];
+            ScenarioSerial serialInfo = ScenarioSerial.fromCode(String.format("%02d", sId));
 
             // AgentDispatchService가 스스로 TestExecution을 생성하고 AI에 요청을 보냅니다.
             // 여기서는 그 결과로 만들어진 ID만 받습니다. (시퀀스 중복 방지)
@@ -142,16 +142,27 @@ public class TestService {
      */
     @Transactional(readOnly = true)
     public List<TestCaseSummaryDto> getTestSummaryList(Long projectId, String sortField, boolean ascending) {
-        log.info("[LIST] 요약 목록 조회 - Sort: {}", sortField);
-        return executionRepo.findAllActiveByProjectId(projectId, sortField, ascending).stream()
+        List<TestExecution> executions = executionRepo.findAllActiveByProjectId(projectId, sortField, ascending);
+        if (executions.isEmpty()) return List.of();
+
+        // 루프 밖에서 한 번의 쿼리로 모든 통계 데이터를 땡겨옵니다. [N+1 문제 방지]
+        List<Long> execIds = executions.stream().map(TestExecution::getExecutionId).toList();
+        Map<Long, Map<ResultStatus, Long>> batchStats = resultRepo.findCountsByExecutionIds(execIds);
+
+        return executions.stream()
                 .flatMap(exec -> exec.getTestResults().stream()
-                        .filter(res -> res.getDeletedAt() == null)
+                        .filter(res -> !res.isDeleted())
                         .map(res -> {
-                            PassRateResponseDto stats = getPassRateStats(exec.getExecutionId());
+                            Map<ResultStatus, Long> counts = batchStats.getOrDefault(exec.getExecutionId(), Map.of());
+
+                            long pass = counts.getOrDefault(ResultStatus.PASS, 0L);
+                            long total = counts.values().stream().mapToLong(l -> l).sum();
+                            String passRatio = calculateRatio(pass, total);
+
                             return new TestCaseSummaryDto(
                                     res.getFullTestCaseId(),
                                     exec.getTestGroup().getGroupName(),
-                                    stats.passRatio(),
+                                    passRatio,
                                     formatDuration(res.getDurationSeconds()),
                                     exec.getTesterName(),
                                     exec.getCompletedAt()
@@ -221,7 +232,7 @@ public class TestService {
      */
     @Transactional(readOnly = true)
     public long countTotalExecutions(Long projectId) {
-        return executionRepo.countByProjectId(projectId);
+        return executionRepo.countByProjectIdAndDeletedAtIsNull(projectId);
     }
 
     /**
@@ -229,6 +240,6 @@ public class TestService {
      */
     @Transactional(readOnly = true)
     public long countResultsInGroup(Long groupId) {
-        return resultRepo.countByTestExecution_TestGroup_GroupId(groupId);
+        return resultRepo.countByTestExecution_TestGroup_GroupIdAndDeletedAtIsNull(groupId);
     }
 }

@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface TestExecutionRepository extends JpaRepository<TestExecution, Long>, TestExecutionRepositoryCustom {
-    long countByProjectId(Long projectId);
+    long countByProjectIdAndDeletedAtIsNull(Long projectId);
     List<TestExecution> findAllByTestGroup_GroupId(Long testGroupGroupId);
 }

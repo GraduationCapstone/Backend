@@ -97,8 +97,12 @@ public class TestController {
             @PathVariable Long projectId,
             @PathVariable Long resultId,
             @Valid @RequestBody TestCodeNameUpdateDto dto) {
-        TestResult r = resultRepo.findById(resultId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (!r.getTestExecution().getProjectId().equals(projectId)) throw new CustomException(ErrorCode.INVALID_ARGUMENT);
+        TestResult r = resultRepo.findActiveById(resultId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!r.getTestExecution().getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
 
         r.updateTestCodeName(dto.newTestCodeName());
         resultRepo.save(r);
@@ -115,8 +119,12 @@ public class TestController {
     public ResponseEntity<Void> deleteResult(
             @PathVariable Long projectId,
             @PathVariable Long resultId) {
-        TestResult r = resultRepo.findById(resultId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (!r.getTestExecution().getProjectId().equals(projectId)) throw new CustomException(ErrorCode.INVALID_ARGUMENT);
+        TestResult r = resultRepo.findActiveById(resultId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!r.getTestExecution().getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
 
         r.softDelete();
         if (r.isDeleted()) resultRepo.save(r);
@@ -133,8 +141,12 @@ public class TestController {
     public ResponseEntity<Void> deleteExecution(
             @PathVariable Long projectId,
             @PathVariable Long executionId) {
-        TestExecution e = executionRepo.findById(executionId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (!e.getProjectId().equals(projectId)) throw new CustomException(ErrorCode.INVALID_ARGUMENT);
+        TestExecution e = executionRepo.findActiveById(executionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!e.getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
 
         e.softDelete();
         if (e.isDeleted()) executionRepo.save(e);
@@ -151,12 +163,17 @@ public class TestController {
             @ApiResponse(responseCode = "404", description = "그룹 정보를 찾을 수 없음")
     })
     @GetMapping("/groups/{groupId}")
-    public ResponseEntity<TestGroup> getGroup(
+    public ResponseEntity<TestGroupResponseDto> getGroup(
             @PathVariable Long projectId,
             @PathVariable Long groupId) {
-        TestGroup g = groupRepo.findById(groupId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (!g.getProjectId().equals(projectId)) throw new CustomException(ErrorCode.INVALID_ARGUMENT);
-        return ResponseEntity.ok(g);
+        TestGroup g = groupRepo.findById(groupId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!g.getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        return ResponseEntity.ok(TestGroupResponseDto.from(g));
     }
 
     @Operation(summary = "테스트 그룹 내(ID, 테스트코드명, 상태, 테스트 시간, 테스터, 일시) 조회 및 정렬 (필드 선택 가능)", description = "field를 입력하지 않으면 기본값(id)으로 정렬됩니다.")
@@ -182,8 +199,12 @@ public class TestController {
     @Operation(summary = "테스트 그룹 내 레포지토리 검색", description = "특정 테스트 그룹의 targetRepoId 등 정보를 조회합니다.")
     @GetMapping("/groups/{groupId}/repo")
     public ResponseEntity<Long> getGroupRepo(@PathVariable Long projectId, @PathVariable Long groupId) {
-        TestGroup g = groupRepo.findById(groupId).orElseThrow();
-        if (!g.getProjectId().equals(projectId)) throw new CustomException(ErrorCode.INVALID_ARGUMENT);
+        TestGroup g = groupRepo.findById(groupId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!g.getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
         return ResponseEntity.ok(g.getTargetRepoId());
     }
 
@@ -193,7 +214,16 @@ public class TestController {
     @ApiResponses({@ApiResponse(responseCode = "302", description = "다운로드 URL로 이동")})
     @GetMapping("/executions/{executionId}/download/plan")
     public ResponseEntity<Void> downloadPlan(@PathVariable Long projectId, @PathVariable Long executionId) {
-        TestExecution e = executionRepo.findById(executionId).orElseThrow();
+        TestExecution e = executionRepo.findActiveById(executionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!e.getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        if (e.getPlanS3Url() == null || e.getPlanS3Url().isBlank()) {
+            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
         return ResponseEntity.status(302).location(URI.create(e.getPlanS3Url())).build();
     }
 
@@ -201,7 +231,16 @@ public class TestController {
     @ApiResponses({@ApiResponse(responseCode = "302", description = "다운로드 URL로 이동")})
     @GetMapping("/executions/{executionId}/download/report")
     public ResponseEntity<Void> downloadReport(@PathVariable Long projectId, @PathVariable Long executionId) {
-        TestExecution e = executionRepo.findById(executionId).orElseThrow();
+        TestExecution e = executionRepo.findActiveById(executionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!e.getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        if (e.getPlanResultS3Url() == null || e.getPlanResultS3Url().isBlank()) {
+            throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
         return ResponseEntity.status(302).location(URI.create(e.getPlanResultS3Url())).build();
     }
 
@@ -219,7 +258,7 @@ public class TestController {
 
         ScenarioDetailData d = r.getScenarioDetail();
         return ResponseEntity.ok(new TestResultDetailFullDto(
-                r.getTestExecution().getTesterName(), r.getStatus().name(), r.getCreatedAt(),
+                r.getTestExecution().getTesterName(), r.getStatus().name(), r.getTestExecution().getCompletedAt(),
                 d.scenarioName(), d.description(), d.testCaseId(), d.testCaseName(),
                 d.precondition(), d.testData(), d.executionSteps(), d.result()
         ));
@@ -236,8 +275,12 @@ public class TestController {
             @PathVariable Long projectId,
             @PathVariable Long resultId,
             @RequestParam String type) {
-        TestResult r = resultRepo.findById(resultId).orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (!r.getTestExecution().getProjectId().equals(projectId)) throw new CustomException(ErrorCode.INVALID_ARGUMENT);
+        TestResult r = resultRepo.findActiveById(resultId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!r.getTestExecution().getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
 
         return switch (type) {
             case "visual" -> ResponseEntity.ok(new TestResultDetailVisualDto(r.getStatus().name(), r.getScreenshotS3Urls()));

@@ -103,7 +103,7 @@ public class AgentDispatchService {
 
         log.info("TestExecution created. Id={}, ScenarioId={}", execution.getExecutionId(), execution.getTestScenarioId());
 
-        // 4. 레포지토리 URL 조회
+        // 4. 레포지토리 URL 조회 -> projectId 대신 전달받은 repoId로 정확한 레포지토리 정보 조회
         GithubRepository targetRepo = githubRepositoryRepository.findByProjectId(projectId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
