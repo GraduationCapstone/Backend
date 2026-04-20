@@ -95,7 +95,7 @@ public class AgentCallbackService {
         if (dto.results() != null && !dto.results().isEmpty()) {
             List<TestResult> results = dto.results().stream()
                     .map(r -> TestResult.builder()
-                            .executionId(dto.executionId())
+                            .testExecution(execution)
                             .testCaseNumber(r.testCaseNumber())
                             .caseName(r.caseName())
                             .testCodeName(r.testCodeName())
