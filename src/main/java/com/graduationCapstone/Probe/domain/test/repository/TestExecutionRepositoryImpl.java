@@ -68,7 +68,7 @@ public class TestExecutionRepositoryImpl implements TestExecutionRepositoryCusto
                 .selectFrom(te)
                 // 페이징 구현 시 defaoult_batch_fetch_size 설정 필요, 필요 시 수정 예정
                 .leftJoin(te.testResults, tr).fetchJoin() // 결과 미리 로딩
-                .leftJoin(te.testGroup, tg).fetchJoin()   // 그룹 정보 미리 로딩
+                .leftJoin(te.testGroup, tg).fetchJoin()   // 그룹 정보 미리 로딩 (NPE 방지)
                 .where(te.projectId.eq(projectId), te.deletedAt.isNull())
                 .orderBy(buildOrderSpecifier(sortField, ascending))
                 .fetch();

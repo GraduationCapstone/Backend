@@ -79,19 +79,11 @@ public class TestService {
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
         if (!group.getProjectId().equals(projectId)) {
-            log.warn("[SECURITY] 권한 없는 프로젝트 테스트 그룹 수정 시도 - ProjectID: {}, GroupID: {}", projectId, groupId);
-            throw new CustomException(ErrorCode.INVALID_ARGUMENT);
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
         }
 
         group.updateGroupName(newName);
-
-        // 하위 모든 테스트 코드의 testName(스냅샷)을 새 그룹명으로 일괄 변경
-        List<TestExecution> executions = executionRepo.findAllByTestGroup_GroupId((groupId));
-        for (TestExecution exec : executions) {
-            exec.updateTestName(newName);
-        }
-
-        log.info("[UPDATE] 테스트 그룹 및 하위 테스트 코드명 수정 완료 - Affected Count: {}", executions.size());
+        log.info("[UPDATE] 테스트 그룹명 수정 완료 (과거 실행 스냅샷은 유지됨) - GroupID: {}", groupId);
     }
 
     /**
@@ -108,8 +100,8 @@ public class TestService {
             throw new CustomException(ErrorCode.INVALID_ARGUMENT);
         }
 
-        groupRepo.delete(group);
-        log.info("[DELETE] 테스트 그룹 삭제 완료 - GroupID: {}", groupId);
+        group.softDelete();
+        log.info("[DELETE] 테스트 그룹 및 하위 실행/결과 Soft Delete 완료 - GroupID: {}", groupId);
     }
 
     /**
@@ -142,7 +134,7 @@ public class TestService {
      */
     @Transactional(readOnly = true)
     public List<TestCaseSummaryDto> getTestSummaryList(Long projectId, String sortField, boolean ascending) {
-        List<TestExecution> executions = executionRepo.findAllActiveByProjectId(projectId, sortField, ascending);
+        List<TestExecution> executions = executionRepo.findAllActiveWithResultsByProjectId(projectId, sortField, ascending);
         if (executions.isEmpty()) return List.of();
 
         // 루프 밖에서 한 번의 쿼리로 모든 통계 데이터를 땡겨옵니다. [N+1 문제 방지]
@@ -159,9 +151,13 @@ public class TestService {
                             long total = counts.values().stream().mapToLong(l -> l).sum();
                             String passRatio = calculateRatio(pass, total);
 
+                            String displayName = (exec.getTestGroup() != null)
+                                    ? exec.getTestGroup().getGroupName()
+                                    : exec.getTestName(); // 그룹 정보가 없으면 실행 시점의 스냅샷 명칭 사용
+
                             return new TestCaseSummaryDto(
                                     res.getFullTestCaseId(),
-                                    exec.getTestGroup().getGroupName(),
+                                    displayName,
                                     passRatio,
                                     formatDuration(res.getDurationSeconds()),
                                     exec.getTesterName(),

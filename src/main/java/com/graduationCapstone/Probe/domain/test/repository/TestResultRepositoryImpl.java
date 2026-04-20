@@ -18,7 +18,6 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
     private final JPAQueryFactory queryFactory;
     private static final QTestResult tr = QTestResult.testResult;
     private static final QTestExecution te = QTestExecution.testExecution;
-    private static final QTestGroup tg = QTestGroup.testGroup;
 
     @Override
     public List<TestResult> findAllActiveByExecutionId(Long executionId, String sortField, boolean ascending) {
@@ -38,6 +37,7 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
     public Optional<TestResult> findActiveById(Long resultId) {
         TestResult result = queryFactory
                 .selectFrom(tr)
+                .join(tr.testExecution, te)
                 .where(
                         tr.resultId.eq(resultId),
                         tr.deletedAt.isNull(),
@@ -52,7 +52,7 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
         List<Tuple> tuples = queryFactory
                 .select(tr.status, tr.count())
                 .from(tr)
-                .join(te).on(tr.testExecution.executionId.eq(te.executionId))
+                .join(tr.testExecution, te)
                 .where(
                         te.projectId.eq(projectId),
                         te.deletedAt.isNull(),
@@ -69,6 +69,7 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
         List<Tuple> tuples = queryFactory
                 .select(tr.status, tr.count())
                 .from(tr)
+                .join(tr.testExecution, te)
                 .where(
                         tr.testExecution.executionId.eq(executionId),
                         te.deletedAt.isNull(),
@@ -90,8 +91,10 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
         List<Tuple> results = queryFactory
                 .select(tr.testExecution.executionId, tr.status, tr.count())
                 .from(tr)
+                .join(tr.testExecution, te)
                 .where(
                         tr.testExecution.executionId.in(executionIds),
+                        te.deletedAt.isNull(), // Execution 자체가 삭제된 경우 카운트 제외
                         tr.deletedAt.isNull() // Soft Delete 필터링
                 )
                 .groupBy(tr.testExecution.executionId, tr.status)
@@ -99,13 +102,15 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
 
         // 결과를 Map<Long, Map<ResultStatus, Long>> 형태로 변환
         // 예: {1L: {PASS: 10, FAIL: 2}, 2L: {PASS: 5, BLOCK: 1}}
-        return results.stream().collect(Collectors.groupingBy(
-                t -> t.get(tr.testExecution.executionId),
-                Collectors.toMap(
-                        t -> t.get(tr.status),
-                        t -> t.get(tr.count())
-                )
-        ));
+        return results.stream()
+                .filter(t -> t.get(tr.testExecution.executionId) != null && t.get(tr.status) != null)
+                .collect(Collectors.groupingBy(
+                        t -> Objects.requireNonNull(t.get(tr.testExecution.executionId)),
+                        Collectors.toMap(
+                                t -> Objects.requireNonNull(t.get(tr.status)),
+                                t -> Objects.requireNonNullElse(t.get(tr.count()), 0L)
+                        )
+                ));
     }
 
     private Map<ResultStatus, Long> toStatusMap(List<Tuple> tuples) {
@@ -114,7 +119,12 @@ public class TestResultRepositoryImpl implements TestResultRepositoryCustom {
             map.put(s, 0L);
         }
         for (Tuple tuple : tuples) {
-            map.put(tuple.get(tr.status), tuple.get(tr.count()));
+            ResultStatus status = tuple.get(tr.status);
+            Long count = tuple.get(tr.count());
+            // Null 반환 방지 및 안전한 맵 주입
+            if (status != null) {
+                map.put(status, Objects.requireNonNullElse(count, 0L));
+            }
         }
         return map;
     }

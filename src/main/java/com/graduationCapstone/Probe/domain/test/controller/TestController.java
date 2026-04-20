@@ -284,8 +284,8 @@ public class TestController {
 
         return switch (type) {
             case "visual" -> ResponseEntity.ok(new TestResultDetailVisualDto(r.getStatus().name(), r.getScreenshotS3Urls()));
-            case "code" -> ResponseEntity.ok(new TestResultDetailCodeDto(r.getTestExecution().getTesterName(), r.getStatus().name(), r.getCreatedAt(), r.getTestCode()));
-            case "basic" -> ResponseEntity.ok(new TestResultDetailBasicDto(r.getTestExecution().getTesterName(), r.getStatus().name(), r.getCreatedAt(), r.getErrorLog()));
+            case "code" -> ResponseEntity.ok(new TestResultDetailCodeDto(r.getTestExecution().getTesterName(), r.getStatus().name(), r.getTestExecution().getCompletedAt(), r.getTestCode()));
+            case "basic" -> ResponseEntity.ok(new TestResultDetailBasicDto(r.getTestExecution().getTesterName(), r.getStatus().name(), r.getTestExecution().getCompletedAt(), r.getErrorLog()));
             default -> ResponseEntity.badRequest().build();
         };
     }
