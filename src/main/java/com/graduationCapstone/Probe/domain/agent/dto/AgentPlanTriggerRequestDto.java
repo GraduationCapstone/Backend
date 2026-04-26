@@ -12,8 +12,8 @@ public record AgentPlanTriggerRequestDto(
         @NotNull(message = "프로젝트 ID는 필수입니다.")
         Long projectId,
 
-        @NotNull(message = "시나리오 ID는 필수입니다.")
-        Long scenarioId,
+        @NotNull(message = "시나리오 시리얼는 필수입니다.")
+        String scenarioSerial,
 
         @NotBlank(message = "시나리오 가이드 이름은 필수입니다.")
         String testItem,        // 예: "회원가입", "로그인"

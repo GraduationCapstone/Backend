@@ -42,15 +42,15 @@ public class TestService {
                 .build());
 
         // 선택된 시나리오 리스트를 순회하며 에이전트에게 생성/발송을 요청합니다.
-        for (Long sId : dto.scenarioIds()) {
-            ScenarioSerial serialInfo = ScenarioSerial.fromCode(String.format("%02d", sId));
+        for (String serial : dto.scenarioSerials()) {
+            ScenarioSerial serialInfo = ScenarioSerial.fromCode(serial);
 
             // AgentDispatchService가 스스로 TestExecution을 생성하고 AI에 요청을 보냅니다.
             // 여기서는 그 결과로 만들어진 ID만 받습니다. (시퀀스 중복 방지)
             Long executionId = agentDispatchService.dispatchPlan(
                     user,
                     projectId,
-                    sId,
+                    serial,
                     serialInfo.getTestItem(),
                     dto.targetBranch()
             );

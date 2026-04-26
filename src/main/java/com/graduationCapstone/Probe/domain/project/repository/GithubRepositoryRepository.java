@@ -6,5 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface GithubRepositoryRepository extends JpaRepository<GithubRepository, Long> {
+    void deleteByProjectId(Long projectId);
     Optional<GithubRepository> findByProjectId(Long projectId);
 }
