@@ -20,6 +20,11 @@ public class GuideInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        if (guideRepository.count() > 0) {
+            log.info("가이드 데이터가 이미 존재하여 초기화를 건너뜁니다.");
+            return;
+        }
+
         log.info("Enum 기반 Guide 마스터 데이터 동기화 시작...");
 
         for (ScenarioSerial serial : ScenarioSerial.values()) {
