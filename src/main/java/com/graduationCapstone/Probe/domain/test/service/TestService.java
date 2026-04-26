@@ -31,6 +31,11 @@ public class TestService {
      */
     @Transactional
     public void createTestEntities(User user, Long projectId, TestGroupCreateRequestDto dto) {
+        if (isGroupNameDuplicate(projectId, dto.baseTestGroupName())) {
+            log.warn("[DUPLICATE] 이미 존재하는 그룹명입니다: {}", dto.baseTestGroupName());
+            throw new CustomException(ErrorCode.DUPLICATE_TESTGROUP_NAME);
+        }
+
         log.info("[FLOW] 테스트 그룹 생성 및 실행 시작 - ProjectID: {}, Group: {}", projectId, dto.baseTestGroupName());
 
         // 사용자가 입력한 그룹명으로 TestGroup을 먼저 저장합니다.
