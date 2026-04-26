@@ -40,6 +40,7 @@ public class ProjectService {
     private final GithubRepoRepository githubRepoRepository;
     private final UserRepository userRepository;
     private final ProjectRepoRepository projectRepoRepository;
+    private final GithubRepositoryRepository githubRepositoryRepository;
 
     private final ScenarioRepository scenarioRepository;
     private final ScenarioGuideRepository scenarioGuideRepository;
@@ -87,6 +88,8 @@ public class ProjectService {
                                     .build();
                             project.addMember(member);
 
+                            Project savedProject = projectRepository.save(project);
+
                             if (request.repoIds() != null && !request.repoIds().isEmpty()) {
                                 List<GithubRepo> repos = githubRepoRepository.findAllById(request.repoIds());
 
@@ -99,9 +102,20 @@ public class ProjectService {
                                             .githubRepo(repo)
                                             .build();
                                     project.addProjectRepo(pr);
+
+                                    // 테스트 시스템용 github_repository 테이블 저장
+                                    GithubRepository gr = GithubRepository.builder()
+                                            .projectId(savedProject.getId())
+                                            .repoUrl("https://github.com/" + repo.getOwner() + "/" + repo.getRepoName())
+                                            .visibility(repo.isPublic() ? "PUBLIC" : "PRIVATE")
+                                            .starCount(repo.getStargazersCount())
+                                            .forkCount(repo.getForksCount())
+                                            .githubUpdatedAt(repo.getUpdatedAt())
+                                            .build();
+                                    githubRepositoryRepository.save(gr);
                                 }
                             }
-                            Project savedProject = projectRepository.save(project);
+
                             initializeDefaultScenarios(savedProject); // 기본 시나리오 자동 생성 호출
                             log.info("프로젝트 생성 성공: id={}", savedProject.getId());
                             return ProjectResponseDto.from(savedProject);
@@ -487,6 +501,7 @@ public class ProjectService {
             validateOwner(projectId, userId);
 
             project.getProjectRepos().clear();
+            githubRepositoryRepository.deleteByProjectId(projectId); //기존 데이터 삭제(github_repository 테이블 동기화)
 
             if (newRepoIds != null && !newRepoIds.isEmpty()) {
                 List<GithubRepo> repos = githubRepoRepository.findAllById(newRepoIds);
@@ -501,6 +516,17 @@ public class ProjectService {
                             .githubRepo(repo)
                             .build();
                     project.addProjectRepo(pr);
+
+                    // 테스트 데이터 저장
+                    GithubRepository gr = GithubRepository.builder()
+                            .projectId(projectId)
+                            .repoUrl("https://github.com/" + repo.getOwner() + "/" + repo.getRepoName())
+                            .visibility(repo.isPublic() ? "PUBLIC" : "PRIVATE")
+                            .starCount(repo.getStargazersCount())
+                            .forkCount(repo.getForksCount())
+                            .githubUpdatedAt(repo.getUpdatedAt())
+                            .build();
+                    githubRepositoryRepository.save(gr);
                 }
             }
             projectRepository.save(project);
