@@ -6,13 +6,9 @@ import com.graduationCapstone.Probe.domain.github.dto.GithubRepoResponseDto;
 import com.graduationCapstone.Probe.domain.github.entity.GithubRepo;
 import com.graduationCapstone.Probe.domain.github.repository.GithubRepoRepository;
 import com.graduationCapstone.Probe.domain.project.dto.*;
-import com.graduationCapstone.Probe.domain.project.entity.Project;
-import com.graduationCapstone.Probe.domain.project.entity.ProjectMember;
-import com.graduationCapstone.Probe.domain.project.entity.ProjectRepo;
-import com.graduationCapstone.Probe.domain.project.entity.ProjectRole;
-import com.graduationCapstone.Probe.domain.project.repository.ProjectMemberRepository;
-import com.graduationCapstone.Probe.domain.project.repository.ProjectRepoRepository;
-import com.graduationCapstone.Probe.domain.project.repository.ProjectRepository;
+import com.graduationCapstone.Probe.domain.project.entity.*;
+import com.graduationCapstone.Probe.domain.project.repository.*;
+import com.graduationCapstone.Probe.domain.test.entity.ScenarioSerial;
 import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.domain.user.repository.UserRepository;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
@@ -44,6 +40,10 @@ public class ProjectService {
     private final GithubRepoRepository githubRepoRepository;
     private final UserRepository userRepository;
     private final ProjectRepoRepository projectRepoRepository;
+
+    private final ScenarioRepository scenarioRepository;
+    private final ScenarioGuideRepository scenarioGuideRepository;
+    private final GuideRepository guideRepository;
 
     private final ReactiveRedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
@@ -102,6 +102,7 @@ public class ProjectService {
                                 }
                             }
                             Project savedProject = projectRepository.save(project);
+                            initializeDefaultScenarios(savedProject); // 기본 시나리오 자동 생성 호출
                             log.info("프로젝트 생성 성공: id={}", savedProject.getId());
                             return ProjectResponseDto.from(savedProject);
                         });
@@ -110,6 +111,32 @@ public class ProjectService {
                 })
                 .subscribeOn(Schedulers.boundedElastic())
                 .doOnError(e -> log.error("프로젝트 생성 실패: {}", e.getMessage()));
+    }
+
+    private void initializeDefaultScenarios(Project project) {
+        log.info("기본 시나리오 초기화 시작: projectId={}", project.getId());
+
+        for (ScenarioSerial serial : ScenarioSerial.values()) {
+            // 1. Scenario 저장
+            Scenario scenario = Scenario.builder()
+                    .projectId(project.getId())
+                    .scenarioSerial(serial.getCode())
+                    .authToken("temp-token-" + UUID.randomUUID().toString().substring(0, 8))
+                    .build();
+
+            Scenario savedScenario = scenarioRepository.save(scenario);
+
+            // 2. ScenarioGuide 저장
+            guideRepository.findByTestItem(serial.getTestItem()).ifPresent(guide -> {
+                ScenarioGuide scenarioGuide = ScenarioGuide.builder()
+                        .scenarioId(savedScenario.getScenarioId())
+                        .stepOrder(1)
+                        .guide(guide)
+                        .build();
+                scenarioGuideRepository.save(scenarioGuide);
+            });
+        }
+        log.info("기본 시나리오 초기화 완료: projectId={}", project.getId());
     }
 
     /**
