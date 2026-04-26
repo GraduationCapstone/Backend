@@ -19,6 +19,9 @@ public class Scenario {
     @Column(name = "project_id", nullable = false)
     private Long projectId;
 
+    @Column(name = "scenario_serial", nullable = false)
+    private String scenarioSerial;
+
     @Column(name = "auth_token", length = 1024)
     private String authToken;
 }
