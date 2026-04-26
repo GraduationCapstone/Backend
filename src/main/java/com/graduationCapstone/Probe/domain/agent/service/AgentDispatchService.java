@@ -72,7 +72,7 @@ public class AgentDispatchService {
      */
     @Transactional
     public Long dispatchPlan(User user, Long projectId, String scenarioSerial,
-                             String testItem, String targetBranch) {
+                             String testItem, String targetBranch, Long targetRepoId) {
         log.info("Dispatching plan. ProjectId={}, Serial={}, TestItem={}", projectId, scenarioSerial, testItem);
 
         // 1. 시나리오 시리얼 조회
@@ -106,7 +106,7 @@ public class AgentDispatchService {
         log.info("TestExecution created. Id={}, ScenarioId={}", execution.getExecutionId(), execution.getTestScenarioId());
 
         // 4. 레포지토리 URL 조회
-        GithubRepository targetRepo = githubRepositoryRepository.findByProjectId(projectId)
+        GithubRepository targetRepo = githubRepositoryRepository.findByProjectIdAndGithubRepoId(projectId, targetRepoId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
         // 5. Scenario (auth_token) 조회
@@ -163,8 +163,10 @@ public class AgentDispatchService {
         // 상태 변경: TESTING (dirty checking으로 트랜잭션 커밋 시 자동 반영)
         execution.updateStatus(ExecutionStatus.TESTING);
 
+        Long targetRepoId = execution.getTestGroup().getTargetRepoId();
+
         // 레포지토리 URL 조회
-        GithubRepository targetRepo = githubRepositoryRepository.findByProjectId(execution.getProjectId())
+        GithubRepository targetRepo = githubRepositoryRepository.findByProjectIdAndGithubRepoId(execution.getProjectId(), targetRepoId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
         String callbackUrl = serverUrl + "/api/agent/callback/test";

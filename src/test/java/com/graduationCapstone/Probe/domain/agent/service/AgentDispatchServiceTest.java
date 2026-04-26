@@ -10,6 +10,7 @@ import com.graduationCapstone.Probe.domain.project.repository.ScenarioRepository
 import com.graduationCapstone.Probe.domain.test.entity.ExecutionStatus;
 import com.graduationCapstone.Probe.domain.test.entity.ScenarioSequence;
 import com.graduationCapstone.Probe.domain.test.entity.TestExecution;
+import com.graduationCapstone.Probe.domain.test.entity.TestGroup;
 import com.graduationCapstone.Probe.domain.test.repository.ScenarioSequenceRepository;
 import com.graduationCapstone.Probe.domain.test.repository.TestExecutionRepository;
 import com.graduationCapstone.Probe.domain.user.entity.User;
@@ -110,6 +111,7 @@ class AgentDispatchServiceTest {
             String scenarioSerial = "01";
             String testItem = "회원가입";
             String targetBranch = "feature/login";
+            Long targetRepoId = 2L;
 
             // ScenarioSequence가 없는 경우 → 새로 생성
             given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, "01"))
@@ -131,7 +133,8 @@ class AgentDispatchServiceTest {
             GithubRepository mockRepo = GithubRepository.builder()
                     .repoUrl("https://github.com/school/target-repo.git")
                     .build();
-            given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
+            given(githubRepositoryRepository.findByProjectIdAndGithubRepoId(projectId, targetRepoId))
+                    .willReturn(Optional.of(mockRepo));
 
             Scenario mockScenario = Scenario.builder()
                     .scenarioId(1L)
@@ -151,7 +154,7 @@ class AgentDispatchServiceTest {
 
             // when
             Long executionId = agentDispatchService.dispatchPlan(
-                    testUser, projectId, scenarioSerial, testItem, targetBranch);
+                    testUser, projectId, scenarioSerial, testItem, targetBranch, targetRepoId);
 
             // then — TestExecution 생성 확인
             ArgumentCaptor<TestExecution> executionCaptor = ArgumentCaptor.forClass(TestExecution.class);
@@ -190,6 +193,7 @@ class AgentDispatchServiceTest {
             // given
             Long projectId = 100L;
             String scenarioSerial = "01";
+            Long targetRepoId = 2L;
 
             ScenarioSequence existingSequence = ScenarioSequence.builder()
                     .projectId(projectId)
@@ -209,7 +213,7 @@ class AgentDispatchServiceTest {
             GithubRepository mockRepo = GithubRepository.builder()
                     .repoUrl("https://github.com/school/repo.git")
                     .build();
-            given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
+            given(githubRepositoryRepository.findByProjectIdAndGithubRepoId(projectId,targetRepoId)).willReturn(Optional.of(mockRepo));
 
             Scenario mockScenario = Scenario.builder().scenarioId(1L).build();
             given(scenarioRepository.findByProjectIdAndScenarioSerial(projectId, scenarioSerial)).willReturn(Optional.of(mockScenario));
@@ -222,7 +226,7 @@ class AgentDispatchServiceTest {
             mockWebServer.enqueue(new MockResponse().setResponseCode(202));
 
             // when
-            agentDispatchService.dispatchPlan(testUser, projectId, scenarioSerial, "회원가입", "main");
+            agentDispatchService.dispatchPlan(testUser, projectId, scenarioSerial, "회원가입", "main", targetRepoId);
 
             // then — attempt가 4로 증가
             ArgumentCaptor<TestExecution> captor = ArgumentCaptor.forClass(TestExecution.class);
@@ -236,7 +240,7 @@ class AgentDispatchServiceTest {
         void dispatchPlan_unknownTestItem_throwsException() {
             // when & then
             assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
-                    testUser, 100L, "01", "존재하지 않는 시나리오", "main"))
+                    testUser, 100L, "01", "존재하지 않는 시나리오", "main", 2L))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -246,6 +250,7 @@ class AgentDispatchServiceTest {
             // given
             Long projectId = 100L;
             String scenarioSerial = "01";
+            Long targetRepoId = 2L;
 
             given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, scenarioSerial))
                     .willReturn(Optional.empty());
@@ -261,11 +266,11 @@ class AgentDispatchServiceTest {
                 ReflectionTestUtils.setField(te, "executionId", 1L);
                 return te;
             });
-            given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.empty());
+            given(githubRepositoryRepository.findByProjectIdAndGithubRepoId(projectId, targetRepoId)).willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
-                    testUser, projectId, scenarioSerial, "회원가입", "main"))
+                    testUser, projectId, scenarioSerial, "회원가입", "main", targetRepoId))
                     .isInstanceOf(CustomException.class)
                     .extracting(e -> ((CustomException) e).getErrorCode())
                     .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
@@ -277,6 +282,7 @@ class AgentDispatchServiceTest {
             // given
             Long projectId = 100L;
             String scenarioSerial = "01";
+            Long targetRepoId = 2L;
 
             given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, scenarioSerial))
                     .willReturn(Optional.empty());
@@ -290,7 +296,7 @@ class AgentDispatchServiceTest {
 
             GithubRepository mockRepo = GithubRepository.builder()
                     .repoUrl("https://github.com/school/repo.git").build();
-            given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
+            given(githubRepositoryRepository.findByProjectIdAndGithubRepoId(projectId,targetRepoId)).willReturn(Optional.of(mockRepo));
 
             Scenario mockScenario = Scenario.builder().scenarioId(1L).build();
             given(scenarioRepository.findByProjectIdAndScenarioSerial(projectId, scenarioSerial))
@@ -301,7 +307,7 @@ class AgentDispatchServiceTest {
 
             // when & then
             assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
-                    testUser, projectId, scenarioSerial, "회원가입", "main"))
+                    testUser, projectId, scenarioSerial, "회원가입", "main", targetRepoId))
                     .isInstanceOf(CustomException.class)
                     .extracting(e -> ((CustomException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_ARGUMENT);
@@ -320,8 +326,14 @@ class AgentDispatchServiceTest {
         void dispatchTest_success() throws InterruptedException {
             // given
             Long executionId = 1L;
+            Long projectId = 100L;
+            Long targetRepoId = 2L;
             User tester = User.builder()
                     .id(1L).githubId("12345").username("tester").email("tester@test.com").build();
+
+            TestGroup mockGroup = TestGroup.builder()
+                    .targetRepoId(targetRepoId)
+                    .build();
 
             TestExecution execution = TestExecution.builder()
                     .executionId(executionId)
@@ -333,11 +345,14 @@ class AgentDispatchServiceTest {
                     .testName("회원가입")
                     .status(ExecutionStatus.PLAN_COMPLETED)
                     .build();
+
+            ReflectionTestUtils.setField(execution, "testGroup", mockGroup);
+
             given(testExecutionRepository.findActiveById(executionId)).willReturn(Optional.of(execution));
 
             GithubRepository mockRepo = GithubRepository.builder()
                     .repoUrl("https://github.com/school/target-repo.git").build();
-            given(githubRepositoryRepository.findByProjectId(100L)).willReturn(Optional.of(mockRepo));
+            given(githubRepositoryRepository.findByProjectIdAndGithubRepoId(projectId, targetRepoId)).willReturn(Optional.of(mockRepo));
 
             mockWebServer.enqueue(new MockResponse().setResponseCode(202));
 

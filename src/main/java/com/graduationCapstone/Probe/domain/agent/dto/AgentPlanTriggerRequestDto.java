@@ -19,6 +19,9 @@ public record AgentPlanTriggerRequestDto(
         String testItem,        // 예: "회원가입", "로그인"
 
         @NotBlank(message = "타겟 브랜치는 필수입니다.")
-        String targetBranch
+        String targetBranch,
+
+        @NotNull(message = "타겟 레포지토리 ID는 필수입니다.")
+        Long targetRepoId
 ) {
 }

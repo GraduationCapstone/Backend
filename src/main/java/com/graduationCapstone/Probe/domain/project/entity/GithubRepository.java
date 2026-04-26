@@ -23,6 +23,10 @@ public class GithubRepository {
     @Column(name = "project_id", nullable = false)
     private Long projectId;
 
+    // 원본 GithubRepo 엔티티의 ID
+    @Column(name = "github_repo_id", nullable = false)
+    private Long githubRepoId;
+
     @Column(name = "repo_url", nullable = false)
     private String repoUrl;
 
