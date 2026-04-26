@@ -50,7 +50,7 @@ public class AgentController {
         Long executionId = agentDispatchService.dispatchPlan(
                 user,
                 requestDto.projectId(),
-                requestDto.scenarioId(),
+                requestDto.scenarioSerial(),
                 requestDto.testItem(),
                 requestDto.targetBranch()
         );

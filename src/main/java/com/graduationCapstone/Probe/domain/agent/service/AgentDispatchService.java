@@ -65,20 +65,22 @@ public class AgentDispatchService {
      *
      * @param user         현재 인증된 사용자
      * @param projectId    프로젝트 ID
-     * @param scenarioId   시나리오 ID
+     * @param scenarioSerial   시나리오시리얼 번호
      * @param testItem     시나리오 가이드 이름 (예: "회원가입")
      * @param targetBranch 테스트 대상 브랜치
      * @return 생성된 TestExecution의 ID
      */
     @Transactional
-    public Long dispatchPlan(User user, Long projectId, Long scenarioId,
+    public Long dispatchPlan(User user, Long projectId, String scenarioSerial,
                              String testItem, String targetBranch) {
-        log.info("Dispatching plan. ProjectId={}, TestItem={}", projectId, testItem);
+        log.info("Dispatching plan. ProjectId={}, Serial={}, TestItem={}", projectId, scenarioSerial, testItem);
 
         // 1. 시나리오 시리얼 조회
-        ScenarioSerial serial = ScenarioSerial.fromTestItem(testItem);
+        Scenario scenario = scenarioRepository.findByProjectIdAndScenarioSerial(projectId, scenarioSerial)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
         // 2. SCENARIO_ATTEMPT 발급 (동시성 제어)
+        ScenarioSerial serial = ScenarioSerial.fromTestItem(testItem);
         ScenarioSequence sequence = scenarioSequenceRepository
                 .findByProjectIdAndScenarioSerialForUpdate(projectId, serial.getCode())
                 .orElseGet(() -> scenarioSequenceRepository.save(
@@ -108,11 +110,11 @@ public class AgentDispatchService {
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
         // 5. Scenario (auth_token) 조회
-        Scenario scenario = scenarioRepository.findById(scenarioId)
-                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+//        Scenario scenario = scenarioRepository.findById(scenarioId)
+//                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
         // 6. 시나리오 스텝에서 requirement 구성
-        List<ScenarioGuide> steps = scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId);
+        List<ScenarioGuide> steps = scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenario.getScenarioId());
         if (steps.isEmpty()) {
             throw new CustomException(ErrorCode.INVALID_ARGUMENT);
         }

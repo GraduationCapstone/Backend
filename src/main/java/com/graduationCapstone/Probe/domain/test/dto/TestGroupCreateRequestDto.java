@@ -13,7 +13,7 @@ public record TestGroupCreateRequestDto(
         Long targetRepoId,
 
         @NotEmpty(message = "최소 하나 이상의 시나리오를 선택해야 합니다.")
-        List<Long> scenarioIds,
+        List<String> scenarioSerials,
 
         @NotBlank(message = "대상 브랜치는 필수입니다.")
         String targetBranch

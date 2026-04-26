@@ -107,7 +107,7 @@ class AgentDispatchServiceTest {
         void dispatchPlan_success() throws InterruptedException {
             // given
             Long projectId = 100L;
-            Long scenarioId = 1L;
+            String scenarioSerial = "01";
             String testItem = "회원가입";
             String targetBranch = "feature/login";
 
@@ -134,30 +134,31 @@ class AgentDispatchServiceTest {
             given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
 
             Scenario mockScenario = Scenario.builder()
-                    .scenarioId(scenarioId)
+                    .scenarioId(1L)
                     .authToken("Bearer test-token-123")
                     .build();
-            given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
+            given(scenarioRepository.findByProjectIdAndScenarioSerial(projectId, scenarioSerial)).willReturn(Optional.of(mockScenario));
 
             Guide mockGuide = Guide.builder().testItem("회원가입 버튼을 누른다").build();
             ScenarioGuide mockScenarioGuide = ScenarioGuide.builder()
                     .stepOrder(1)
                     .guide(mockGuide)
                     .build();
-            given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
+            given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(1L))
                     .willReturn(List.of(mockScenarioGuide));
 
             mockWebServer.enqueue(new MockResponse().setResponseCode(202));
 
             // when
             Long executionId = agentDispatchService.dispatchPlan(
-                    testUser, projectId, scenarioId, testItem, targetBranch);
+                    testUser, projectId, scenarioSerial, testItem, targetBranch);
 
             // then — TestExecution 생성 확인
             ArgumentCaptor<TestExecution> executionCaptor = ArgumentCaptor.forClass(TestExecution.class);
             verify(testExecutionRepository).save(executionCaptor.capture());
             TestExecution savedExecution = executionCaptor.getValue();
 
+            assertThat(executionId).isEqualTo(1L);
             assertThat(savedExecution.getProjectId()).isEqualTo(projectId);
             assertThat(savedExecution.getTester()).isEqualTo(testUser);
             assertThat(savedExecution.getTesterName()).isEqualTo("tester");
@@ -188,7 +189,7 @@ class AgentDispatchServiceTest {
         void dispatchPlan_existingSequence_incrementsAttempt() {
             // given
             Long projectId = 100L;
-            Long scenarioId = 1L;
+            String scenarioSerial = "01";
 
             ScenarioSequence existingSequence = ScenarioSequence.builder()
                     .projectId(projectId)
@@ -210,18 +211,18 @@ class AgentDispatchServiceTest {
                     .build();
             given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
 
-            Scenario mockScenario = Scenario.builder().scenarioId(scenarioId).build();
-            given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
+            Scenario mockScenario = Scenario.builder().scenarioId(1L).build();
+            given(scenarioRepository.findByProjectIdAndScenarioSerial(projectId, scenarioSerial)).willReturn(Optional.of(mockScenario));
 
             Guide mockGuide = Guide.builder().testItem("회원가입").build();
             ScenarioGuide sg = ScenarioGuide.builder().stepOrder(1).guide(mockGuide).build();
-            given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
+            given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(1L))
                     .willReturn(List.of(sg));
 
             mockWebServer.enqueue(new MockResponse().setResponseCode(202));
 
             // when
-            agentDispatchService.dispatchPlan(testUser, projectId, scenarioId, "회원가입", "main");
+            agentDispatchService.dispatchPlan(testUser, projectId, scenarioSerial, "회원가입", "main");
 
             // then — attempt가 4로 증가
             ArgumentCaptor<TestExecution> captor = ArgumentCaptor.forClass(TestExecution.class);
@@ -235,7 +236,7 @@ class AgentDispatchServiceTest {
         void dispatchPlan_unknownTestItem_throwsException() {
             // when & then
             assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
-                    testUser, 100L, 1L, "존재하지 않는 시나리오", "main"))
+                    testUser, 100L, "01", "존재하지 않는 시나리오", "main"))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -244,13 +245,17 @@ class AgentDispatchServiceTest {
         void dispatchPlan_repoNotFound_throwsException() {
             // given
             Long projectId = 100L;
-            Long scenarioId = 1L;
+            String scenarioSerial = "01";
 
-            ScenarioSequence seq = ScenarioSequence.builder()
-                    .projectId(projectId).scenarioSerial("01").build();
-            given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, "01"))
+            given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, scenarioSerial))
                     .willReturn(Optional.empty());
-            given(scenarioSequenceRepository.save(any(ScenarioSequence.class))).willReturn(seq);
+            given(scenarioSequenceRepository.save(any(ScenarioSequence.class))).willReturn(ScenarioSequence.builder().projectId(projectId).scenarioSerial(scenarioSerial).build());
+
+            // 시나리오 조회는 성공하지만 레포지토리 조회가 실패하는 상황
+            Scenario mockScenario = Scenario.builder().scenarioId(1L).build();
+            given(scenarioRepository.findByProjectIdAndScenarioSerial(projectId, scenarioSerial))
+                    .willReturn(Optional.of(mockScenario));
+
             given(testExecutionRepository.save(any(TestExecution.class))).willAnswer(invocation -> {
                 TestExecution te = invocation.getArgument(0);
                 ReflectionTestUtils.setField(te, "executionId", 1L);
@@ -260,7 +265,7 @@ class AgentDispatchServiceTest {
 
             // when & then
             assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
-                    testUser, projectId, scenarioId, "회원가입", "main"))
+                    testUser, projectId, scenarioSerial, "회원가입", "main"))
                     .isInstanceOf(CustomException.class)
                     .extracting(e -> ((CustomException) e).getErrorCode())
                     .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
@@ -271,13 +276,12 @@ class AgentDispatchServiceTest {
         void dispatchPlan_emptySteps_throwsException() {
             // given
             Long projectId = 100L;
-            Long scenarioId = 1L;
+            String scenarioSerial = "01";
 
-            ScenarioSequence seq = ScenarioSequence.builder()
-                    .projectId(projectId).scenarioSerial("01").build();
-            given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, "01"))
+            given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, scenarioSerial))
                     .willReturn(Optional.empty());
-            given(scenarioSequenceRepository.save(any(ScenarioSequence.class))).willReturn(seq);
+            given(scenarioSequenceRepository.save(any(ScenarioSequence.class)))
+                    .willReturn(ScenarioSequence.builder().projectId(projectId).scenarioSerial(scenarioSerial).build());
             given(testExecutionRepository.save(any(TestExecution.class))).willAnswer(invocation -> {
                 TestExecution te = invocation.getArgument(0);
                 ReflectionTestUtils.setField(te, "executionId", 1L);
@@ -288,15 +292,16 @@ class AgentDispatchServiceTest {
                     .repoUrl("https://github.com/school/repo.git").build();
             given(githubRepositoryRepository.findByProjectId(projectId)).willReturn(Optional.of(mockRepo));
 
-            Scenario mockScenario = Scenario.builder().scenarioId(scenarioId).build();
-            given(scenarioRepository.findById(scenarioId)).willReturn(Optional.of(mockScenario));
+            Scenario mockScenario = Scenario.builder().scenarioId(1L).build();
+            given(scenarioRepository.findByProjectIdAndScenarioSerial(projectId, scenarioSerial))
+                    .willReturn(Optional.of(mockScenario));
 
-            given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(scenarioId))
+            given(scenarioGuideRepository.findAllByScenarioIdOrderByStepOrder(1L))
                     .willReturn(List.of());
 
             // when & then
             assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
-                    testUser, projectId, scenarioId, "회원가입", "main"))
+                    testUser, projectId, scenarioSerial, "회원가입", "main"))
                     .isInstanceOf(CustomException.class)
                     .extracting(e -> ((CustomException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_ARGUMENT);
