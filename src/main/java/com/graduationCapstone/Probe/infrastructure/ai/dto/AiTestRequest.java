@@ -13,8 +13,8 @@ public record AiTestRequest(
         @JsonProperty("repository_url")
         String repositoryUrl,
 
-        @JsonProperty("branch")
-        String branch,
+        @JsonProperty("target_branch")
+        String targetBranch,
 
         @JsonProperty("requirement")
         String requirement,

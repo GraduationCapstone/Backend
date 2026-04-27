@@ -12,6 +12,7 @@ import com.graduationCapstone.Probe.domain.test.repository.TestExecutionReposito
 import com.graduationCapstone.Probe.domain.user.entity.User;
 import com.graduationCapstone.Probe.global.exception.ErrorCode;
 import com.graduationCapstone.Probe.global.exception.handler.CustomException;
+import com.graduationCapstone.Probe.infrastructure.ai.dto.AiExecuteTestRequest;
 import com.graduationCapstone.Probe.infrastructure.ai.dto.AiTestRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -163,24 +164,9 @@ public class AgentDispatchService {
         // 상태 변경: TESTING (dirty checking으로 트랜잭션 커밋 시 자동 반영)
         execution.updateStatus(ExecutionStatus.TESTING);
 
-        Long targetRepoId = execution.getTestGroup().getTargetRepoId();
-
-        // 레포지토리 URL 조회
-        GithubRepository targetRepo = githubRepositoryRepository.findByProjectIdAndGithubRepoId(execution.getProjectId(), targetRepoId)
-                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
-
         String callbackUrl = serverUrl + "/api/agent/callback/test";
 
-        AiTestRequest request = new AiTestRequest(
-                executionId,
-                targetRepo.getRepoUrl(),
-                null,   // branch는 이미 AI 서버가 알고 있음 (계획서 생성 시 전달됨)
-                null,   // requirement도 동일
-                null,   // authToken도 동일
-                callbackUrl,
-                execution.getScenarioSerial(),
-                String.format("%02d", execution.getScenarioAttempt())
-        );
+        AiExecuteTestRequest request = new AiExecuteTestRequest(executionId, callbackUrl);
 
         // AI 서버 호출 (비동기)
         dispatchToAi(executionId, request, AI_TEST_PATH);
@@ -190,7 +176,7 @@ public class AgentDispatchService {
      * AI 서버로 요청을 비동기 전송합니다.
      */
     @Async("agentExecutor")
-    public void dispatchToAi(Long executionId, AiTestRequest request, String path) {
+    public void dispatchToAi(Long executionId, Object request, String path) {
         log.info("Dispatching to AI server. ExecutionId={}, Path={}", executionId, path);
 
         aiWebClient.post()
