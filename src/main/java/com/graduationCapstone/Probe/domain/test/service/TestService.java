@@ -30,7 +30,12 @@ public class TestService {
      * 시나리오가 1개여도 동일한 '그룹화' 과정을 거칩니다.
      */
     @Transactional
-    public void createTestEntities(User user, Long projectId, TestGroupCreateRequestDto dto) {
+    public List<Long> createTestEntities(User user, Long projectId, TestGroupCreateRequestDto dto) {
+        if (isGroupNameDuplicate(projectId, dto.baseTestGroupName())) {
+            log.warn("[DUPLICATE] 이미 존재하는 그룹명입니다: {}", dto.baseTestGroupName());
+            throw new CustomException(ErrorCode.DUPLICATE_TESTGROUP_NAME);
+        }
+
         log.info("[FLOW] 테스트 그룹 생성 및 실행 시작 - ProjectID: {}, Group: {}", projectId, dto.baseTestGroupName());
 
         // 사용자가 입력한 그룹명으로 TestGroup을 먼저 저장합니다.
@@ -40,6 +45,8 @@ public class TestService {
                 .targetRepoId(dto.targetRepoId())
                 .targetBranch(dto.targetBranch())
                 .build());
+
+        List<Long> executionIds = new java.util.ArrayList<>();
 
         // 선택된 시나리오 리스트를 순회하며 에이전트에게 생성/발송을 요청합니다.
         for (String serial : dto.scenarioSerials()) {
@@ -52,7 +59,8 @@ public class TestService {
                     projectId,
                     serial,
                     serialInfo.getTestItem(),
-                    dto.targetBranch()
+                    dto.targetBranch(),
+                    dto.targetRepoId()
             );
 
             // 에이전트가 만든 실행 엔티티를 찾아 그룹과 이름을 동기화합니다.
@@ -62,10 +70,29 @@ public class TestService {
             // 테스트 그룹 엔티티와 그룹명 스냅샷을 강제로 주입하여 교정합니다.
             execution.updateGroupAndName(group, group.getGroupName());
 
+            executionIds.add(executionId);
+
             log.info("[FLOW] 에이전트 요청 완료 및 후처리 성공 - ExecutionID: {}, Scenario: {}",
                     executionId, serialInfo.getTestItem());
         }
         log.info("[FLOW] 모든 시나리오에 대한 그룹 테스트 요청 완료");
+        return executionIds;
+    }
+
+    /**
+     * 테스트 계획서/실행 상태 조회
+     */
+    @Transactional(readOnly = true)
+    public String getExecutionStatus(Long projectId, Long executionId) {
+        TestExecution execution = executionRepo.findById(executionId)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!execution.getProjectId().equals(projectId)) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        // status Enum의 name을 반환 (PLAN_GENERATING, PLAN_COMPLETED 등)
+        return execution.getStatus().name();
     }
 
     /**

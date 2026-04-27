@@ -106,6 +106,7 @@ public class ProjectService {
                                     // 테스트 시스템용 github_repository 테이블 저장
                                     GithubRepository gr = GithubRepository.builder()
                                             .projectId(savedProject.getId())
+                                            .githubRepoId(repo.getId())
                                             .repoUrl("https://github.com/" + repo.getOwner() + "/" + repo.getRepoName())
                                             .visibility(repo.isPublic() ? "PUBLIC" : "PRIVATE")
                                             .starCount(repo.getStargazersCount())
@@ -520,6 +521,7 @@ public class ProjectService {
                     // 테스트 데이터 저장
                     GithubRepository gr = GithubRepository.builder()
                             .projectId(projectId)
+                            .githubRepoId(repo.getId())
                             .repoUrl("https://github.com/" + repo.getOwner() + "/" + repo.getRepoName())
                             .visibility(repo.isPublic() ? "PUBLIC" : "PRIVATE")
                             .starCount(repo.getStargazersCount())

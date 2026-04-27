@@ -40,6 +40,7 @@ public enum ErrorCode {
     // 409 CONFLICT (데이터 충돌)
     DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "RESOURCE40901", "데이터 무결성 제약 조건(예: 중복 값)을 위반했습니다."),
     DUPLICATE_PROJECT_NAME(HttpStatus.CONFLICT, "PROJ40901", "이미 동일한 이름의 프로젝트를 보유하고 있습니다."),
+    DUPLICATE_TESTGROUP_NAME(HttpStatus.CONFLICT, "TESTGROUP40901", "이미 동일한 이름의 테스트 그룹을 보유하고 있습니다."),
 
     // 500 INTERNAL SERVER ERROR (서버 내부 오류)
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "SERVER50001", "서버 내부 오류가 발생했습니다."),

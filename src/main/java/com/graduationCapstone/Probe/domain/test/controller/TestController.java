@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "Test", description = "테스트 대시보드 및 결과 데이터 관리 API")
 @RestController
@@ -39,12 +40,12 @@ public class TestController {
             @ApiResponse(responseCode = "400", description = "잘못된 요청 데이터")
     })
     @PostMapping("/setup")
-    public ResponseEntity<Void> setup(
+    public ResponseEntity<List<Long>> setup(
             @PathVariable Long projectId,
             @AuthenticationPrincipal User user,
             @Valid @RequestBody TestGroupCreateRequestDto dto) {
-        testService.createTestEntities(user, projectId, dto);
-        return ResponseEntity.ok().build();
+        List<Long> executionIds = testService.createTestEntities(user, projectId, dto);
+        return ResponseEntity.ok(executionIds);
     }
 
     @Operation(summary = "테스트 그룹명 중복 체크", description = "프로젝트 내에 동일한 테스트 그룹명이 존재하는지 확인합니다.")
@@ -209,6 +210,20 @@ public class TestController {
     }
 
     // ── 상세 조회 및 다운로드 (Details & Downloads) ──
+
+    @Operation(summary = "테스트 실행 상태 조회", description = "특정 실행 ID의 현재 상태를 조회합니다 (PLAN_GENERATING, PLAN_COMPLETED 등)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "상태 조회 성공"),
+            @ApiResponse(responseCode = "403", description = "해당 프로젝트에 속하지 않은 실행 정보 (권한 없음)"),
+            @ApiResponse(responseCode = "404", description = "실행 정보를 찾을 수 없음")
+    })
+    @GetMapping("/executions/{executionId}/status")
+    public ResponseEntity<Map<String, String>> getStatus(
+            @PathVariable Long projectId,
+            @PathVariable Long executionId) {
+        String status = testService.getExecutionStatus(projectId, executionId);
+        return ResponseEntity.ok(Map.of("status", status));
+    }
 
     @Operation(summary = "테스트 계획서 다운로드", description = "S3에 저장된 테스트 계획서(.xlsx) URL로 리다이렉트합니다.")
     @ApiResponses({@ApiResponse(responseCode = "302", description = "다운로드 URL로 이동")})

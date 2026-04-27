@@ -52,7 +52,8 @@ public class AgentController {
                 requestDto.projectId(),
                 requestDto.scenarioSerial(),
                 requestDto.testItem(),
-                requestDto.targetBranch()
+                requestDto.targetBranch(),
+                requestDto.targetRepoId()
         );
 
         return ResponseEntity.accepted().body(Map.of("executionId", executionId));
