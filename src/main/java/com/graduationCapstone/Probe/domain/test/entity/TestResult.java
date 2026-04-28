@@ -36,7 +36,7 @@ public class TestResult {
      * AI가 부여한 테스트 케이스 번호 (2자리, 예: "01", "02").
      * 테스트케이스 ID = T[SCENARIO_SERIAL][SCENARIO_ATTEMPT]_[testCaseNumber]
      */
-    @Column(name = "test_case_number", length = 2)
+    @Column(name = "test_case_number", length = 50)
     private String testCaseNumber;
 
     // ── 테스트 정보 ──
