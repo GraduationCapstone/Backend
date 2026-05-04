@@ -33,7 +33,7 @@ public class TestController {
 
     // ── 초기 설정 및 중복 체크 ──
 
-    @Operation(summary = "테스트 그룹 엔티티 생성", description = "테스트 그룹 및 실행 데이터를 생성합니다.")
+    @Operation(summary = "테스트 그룹 엔티티 생성", description = "테스트 그룹 및 실행 데이터를 생성합니다. 서버URL은 선택 사항입니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "생성 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 데이터")
@@ -176,7 +176,7 @@ public class TestController {
         return ResponseEntity.ok(TestGroupResponseDto.from(g));
     }
 
-    @Operation(summary = "테스트 그룹 내(ID, 테스트코드명, 상태, 테스트 시간, 테스터, 일시) 조회 및 정렬 (필드 선택 가능)", description = "field를 입력하지 않으면 기본값(id)으로 정렬됩니다.")
+    @Operation(summary = "프로젝트 내 테스트 그룹 관련 정보(ID, 테스트코드명, Pass 비율, 테스트 시간, 테스터, 일시) 조회 및 정렬 (필드 선택 가능)", description = "field를 입력하지 않으면 기본값(id)으로 정렬됩니다.")
     @GetMapping("/list/basic") // 쿼리 파라미터 사용
     public ResponseEntity<List<TestExecutionListDto>> getBasicListOptional(
             @PathVariable Long projectId,
@@ -185,7 +185,7 @@ public class TestController {
         return ResponseEntity.ok(testService.getBasicSortedList(projectId, field, asc));
     }
 
-    @Operation(summary = "프로젝트 내 테스트 그룹 정보(ID, 테스트명, Pass 비율, 테스트 시간, 테스터, 일시) 조회 및 정렬 (필드 선택 가능)",
+    @Operation(summary = "테스트 결과 관련 정보(ID, 테스트명, 상태, 테스트 시간, 테스터, 일시) 조회 및 정렬 (필드 선택 가능)",
             description = "field 미입력 시 기본값(id)으로 정렬됩니다.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "요약 목록 조회 성공")})
     @GetMapping("/list/summary") // 쿼리 파라미터 사용

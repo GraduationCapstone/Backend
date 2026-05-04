@@ -44,6 +44,7 @@ public class TestService {
                 .groupName(dto.baseTestGroupName())
                 .targetRepoId(dto.targetRepoId())
                 .targetBranch(dto.targetBranch())
+                .optionalServerUrl(dto.optionalServerUrl())
                 .build());
 
         List<Long> executionIds = new java.util.ArrayList<>();
@@ -140,57 +141,61 @@ public class TestService {
     }
 
     /**
-     * 기본 목록 조회 및 정렬
+     * [Basic 목록] 프로젝트 내 테스트 그룹 요약 정보 조회
+     * 반환 규격: groupId, testCaseId, testCodeName, passRatio, duration, tester, testerProfileImage, completedAt
      */
     @Transactional(readOnly = true)
     public List<TestExecutionListDto> getBasicSortedList(Long projectId, String field, boolean ascending) {
-        log.info("[LIST] 기본 목록 조회 - Field: {}, Asc: {}", field, ascending);
-        return executionRepo.findAllActiveByProjectId(projectId, field, ascending).stream()
-                .map(e -> new TestExecutionListDto(
-                        e.getTestScenarioId(),
-                        e.getTestName(),
-                        e.getStatus().name(),
-                        formatDuration(e.getDurationSeconds()),
-                        e.getTesterName(),
-                        e.getCompletedAt()
-                )).toList();
-    }
+        log.info("[LIST] Basic 요약 목록 조회 - ProjectID: {}", projectId);
 
-    /**
-     * 정렬 기준에 따라 테스트 요약 목록을 조회합니다.
-     */
-    @Transactional(readOnly = true)
-    public List<TestCaseSummaryDto> getTestSummaryList(Long projectId, String sortField, boolean ascending) {
-        List<TestExecution> executions = executionRepo.findAllActiveWithResultsByProjectId(projectId, sortField, ascending);
-        if (executions.isEmpty()) return List.of();
+        List<TestExecution> executions = executionRepo.findAllActiveByProjectId(projectId, field, ascending);
 
-        // 루프 밖에서 한 번의 쿼리로 모든 통계 데이터를 땡겨옵니다. [N+1 문제 방지]
+        // 통계 일괄 조회를 위해 ID 추출
         List<Long> execIds = executions.stream().map(TestExecution::getExecutionId).toList();
         Map<Long, Map<ResultStatus, Long>> batchStats = resultRepo.findCountsByExecutionIds(execIds);
 
         return executions.stream()
+                .map(e -> {
+                    Map<ResultStatus, Long> counts = batchStats.getOrDefault(e.getExecutionId(), Map.of());
+                    long pass = counts.getOrDefault(ResultStatus.PASS, 0L);
+                    long total = counts.values().stream().mapToLong(l -> l).sum();
+
+                    return new TestExecutionListDto(
+                            e.getTestGroup() != null ? e.getTestGroup().getGroupId() : null,
+                            e.getTestScenarioId(),
+                            e.getTestName(),
+                            calculateRatio(pass, total),
+                            formatDuration(e.getDurationSeconds()),
+                            e.getTesterName(),
+                            e.getTester() != null ? e.getTester().getProfileImageUrl() : null,
+                            e.getCompletedAt()
+                    );
+                }).toList();
+    }
+
+    /**
+     * [Summary 목록] 테스트 결과 상세 목록 조회
+     * 반환 규격: resultId, testCaseId, testGroupName, status, duration, tester, testerProfileImage, completedAt
+     */
+    @Transactional(readOnly = true)
+    public List<TestCaseSummaryDto> getTestSummaryList(Long projectId, String sortField, boolean ascending) {
+        log.info("[LIST] Summary 상세 결과 조회 - ProjectID: {}", projectId);
+
+        List<TestExecution> executions = executionRepo.findAllActiveWithResultsByProjectId(projectId, sortField, ascending);
+
+        return executions.stream()
                 .flatMap(exec -> exec.getTestResults().stream()
                         .filter(res -> !res.isDeleted())
-                        .map(res -> {
-                            Map<ResultStatus, Long> counts = batchStats.getOrDefault(exec.getExecutionId(), Map.of());
-
-                            long pass = counts.getOrDefault(ResultStatus.PASS, 0L);
-                            long total = counts.values().stream().mapToLong(l -> l).sum();
-                            String passRatio = calculateRatio(pass, total);
-
-                            String displayName = (exec.getTestGroup() != null)
-                                    ? exec.getTestGroup().getGroupName()
-                                    : exec.getTestName(); // 그룹 정보가 없으면 실행 시점의 스냅샷 명칭 사용
-
-                            return new TestCaseSummaryDto(
-                                    res.getFullTestCaseId(),
-                                    displayName,
-                                    passRatio,
-                                    formatDuration(res.getDurationSeconds()),
-                                    exec.getTesterName(),
-                                    exec.getCompletedAt()
-                            );
-                        })
+                        .map(res -> new TestCaseSummaryDto(
+                                res.getResultId(),
+                                res.getFullTestCaseId(),
+                                exec.getTestGroup() != null ? exec.getTestGroup().getGroupName() : exec.getTestName(),
+                                res.getStatus().name(),
+                                formatDuration(res.getDurationSeconds()),
+                                exec.getTesterName(),
+                                exec.getTester() != null ? exec.getTester().getProfileImageUrl() : null,
+                                exec.getCompletedAt()
+                        ))
                 ).toList();
     }
 

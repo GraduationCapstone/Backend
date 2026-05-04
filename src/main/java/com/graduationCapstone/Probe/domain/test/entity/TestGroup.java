@@ -34,6 +34,9 @@ public class TestGroup {
     @Column(name = "target_branch", length = 100)
     private String targetBranch;
 
+    @Column(name = "optional_server_url")
+    private String optionalServerUrl; // 사용자가 선택적으로 입력할 수 있는 서버 URL
+
     @OneToMany(mappedBy = "testGroup", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TestExecution> testExecutions;
 
