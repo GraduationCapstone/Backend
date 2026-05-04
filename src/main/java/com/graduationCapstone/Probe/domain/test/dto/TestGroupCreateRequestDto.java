@@ -16,5 +16,7 @@ public record TestGroupCreateRequestDto(
         List<String> scenarioSerials,
 
         @NotBlank(message = "대상 브랜치는 필수입니다.")
-        String targetBranch
+        String targetBranch,
+
+        String optionalServerUrl
 ) {}
