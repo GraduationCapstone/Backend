@@ -109,6 +109,6 @@ public class TestResult {
 
     /** 테스트케이스ID 반환 */
     public String getFullTestCaseId() {
-        return String.format("%s_%s", testExecution.getTestScenarioId(), this.testCaseNumber);
+        return this.testCaseNumber;
     }
 }
