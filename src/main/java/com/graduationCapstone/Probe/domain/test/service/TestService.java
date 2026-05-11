@@ -142,7 +142,7 @@ public class TestService {
 
     /**
      * [Basic 목록] 프로젝트 내 테스트 그룹 요약 정보 조회
-     * 반환 규격: groupId, testCaseId, testCodeName, passRatio, duration, tester, testerProfileImage, completedAt
+     * 반환 규격: groupId, testCaseId, testGroupName, passRatio, duration, tester, testerProfileImage, completedAt
      */
     @Transactional(readOnly = true)
     public List<TestExecutionListDto> getBasicSortedList(Long projectId, String field, boolean ascending) {
@@ -163,7 +163,7 @@ public class TestService {
                     return new TestExecutionListDto(
                             e.getTestGroup() != null ? e.getTestGroup().getGroupId() : null,
                             e.getTestScenarioId(),
-                            e.getTestName(),
+                            e.getTestGroup() != null ? e.getTestGroup().getGroupName() : e.getTestName(),
                             calculateRatio(pass, total),
                             formatDuration(e.getDurationSeconds()),
                             e.getTesterName(),
@@ -175,7 +175,7 @@ public class TestService {
 
     /**
      * [Summary 목록] 테스트 결과 상세 목록 조회
-     * 반환 규격: resultId, testCaseId, testGroupName, status, duration, tester, testerProfileImage, completedAt
+     * 반환 규격: resultId, testCaseId, testCodeName, status, duration, tester, testerProfileImage, completedAt
      */
     @Transactional(readOnly = true)
     public List<TestCaseSummaryDto> getTestSummaryList(Long projectId, String sortField, boolean ascending) {
@@ -189,7 +189,7 @@ public class TestService {
                         .map(res -> new TestCaseSummaryDto(
                                 res.getResultId(),
                                 res.getFullTestCaseId(),
-                                exec.getTestGroup() != null ? exec.getTestGroup().getGroupName() : exec.getTestName(),
+                                res.getTestCodeName(),
                                 res.getStatus().name(),
                                 formatDuration(res.getDurationSeconds()),
                                 exec.getTesterName(),
