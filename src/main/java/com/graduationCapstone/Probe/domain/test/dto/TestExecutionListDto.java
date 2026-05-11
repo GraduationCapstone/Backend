@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 public record TestExecutionListDto(
         Long groupId,
         String testCaseId,
-        String testCodeName,
+        String testGroupName,
         String passRatio,
         String duration,
         String tester,
