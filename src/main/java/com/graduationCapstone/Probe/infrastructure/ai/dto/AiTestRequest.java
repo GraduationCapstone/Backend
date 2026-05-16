@@ -20,8 +20,8 @@ public class AiTestRequest {
         @JsonProperty("repository_url")
         private String repositoryUrl;
 
-        @JsonProperty("branch")
-        private String branch;
+        @JsonProperty("target_branch")
+        private String targetBranch;
 
         @JsonProperty("requirement")
         private String requirement;
