@@ -15,26 +15,26 @@ import lombok.NoArgsConstructor;
 public class AiTestRequest {
 
         @JsonProperty("execution_id")
-        private Long executionId;
+        Long executionId;
 
         @JsonProperty("repository_url")
-        private String repositoryUrl;
+        String repositoryUrl;
 
         @JsonProperty("target_branch")
-        private String targetBranch;
+        String targetBranch;
 
         @JsonProperty("requirement")
-        private String requirement;
+        String requirement;
 
         @JsonProperty("auth_token")
-        private String authToken;
+        String authToken;
 
         @JsonProperty("callback_url")
-        private String callbackUrl;
+        String callbackUrl;
 
         @JsonProperty("scenario_serial")
-        private String scenarioSerial;
+        String scenarioSerial;
 
         @JsonProperty("scenario_attempt")
-        private String scenarioAttempt;
+        String scenarioAttempt;
 }
