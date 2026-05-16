@@ -17,7 +17,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -225,10 +224,13 @@ public class TestController {
         return ResponseEntity.ok(Map.of("status", status));
     }
 
-    @Operation(summary = "테스트 계획서 다운로드", description = "S3에 저장된 테스트 계획서(.xlsx) URL로 리다이렉트합니다.")
-    @ApiResponses({@ApiResponse(responseCode = "302", description = "다운로드 URL로 이동")})
+    @Operation(summary = "테스트 계획서 다운로드", description = "S3에 저장된 테스트 계획서(.xlsx)의 Presigned URL을 JSON으로 반환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Presigned URL 반환 성공"),
+            @ApiResponse(responseCode = "404", description = "계획서 URL이 존재하지 않음")
+    })
     @GetMapping("/executions/{executionId}/download/plan")
-    public ResponseEntity<Void> downloadPlan(@PathVariable Long projectId, @PathVariable Long executionId) {
+    public ResponseEntity<Map<String, String>> downloadPlan(@PathVariable Long projectId, @PathVariable Long executionId) {
         TestExecution e = executionRepo.findActiveById(executionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
@@ -239,13 +241,16 @@ public class TestController {
         if (e.getPlanS3Url() == null || e.getPlanS3Url().isBlank()) {
             throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
         }
-        return ResponseEntity.status(302).location(URI.create(e.getPlanS3Url())).build();
+        return ResponseEntity.ok(Map.of("url", e.getPlanS3Url()));
     }
 
-    @Operation(summary = "테스트 보고서 다운로드", description = "S3에 저장된 결과 보고서(.xlsx) URL로 리다이렉트합니다.")
-    @ApiResponses({@ApiResponse(responseCode = "302", description = "다운로드 URL로 이동")})
+    @Operation(summary = "테스트 보고서 다운로드", description = "S3에 저장된 결과 보고서(.xlsx)의 Presigned URL을 JSON으로 반환합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Presigned URL 반환 성공"),
+            @ApiResponse(responseCode = "404", description = "보고서 URL이 존재하지 않음")
+    })
     @GetMapping("/executions/{executionId}/download/report")
-    public ResponseEntity<Void> downloadReport(@PathVariable Long projectId, @PathVariable Long executionId) {
+    public ResponseEntity<Map<String, String>> downloadReport(@PathVariable Long projectId, @PathVariable Long executionId) {
         TestExecution e = executionRepo.findActiveById(executionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
@@ -256,7 +261,7 @@ public class TestController {
         if (e.getPlanResultS3Url() == null || e.getPlanResultS3Url().isBlank()) {
             throw new CustomException(ErrorCode.RESOURCE_NOT_FOUND);
         }
-        return ResponseEntity.status(302).location(URI.create(e.getPlanResultS3Url())).build();
+        return ResponseEntity.ok(Map.of("url", e.getPlanResultS3Url()));
     }
 
     @Operation(summary = "테스트 결과 중 테스트 시나리오 항목 조회", description = "대시보드에서 테스트 결과 상세 조회 시 '테스트 시나리오'을 눌렀을 때 떠야하는 항목들")

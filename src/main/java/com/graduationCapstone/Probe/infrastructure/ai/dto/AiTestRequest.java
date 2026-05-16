@@ -21,7 +21,7 @@ public class AiTestRequest {
         String repositoryUrl;
 
         @JsonProperty("target_branch")
-        String targetBranch;
+        String targetBranch,
 
         @JsonProperty("requirement")
         String requirement;
