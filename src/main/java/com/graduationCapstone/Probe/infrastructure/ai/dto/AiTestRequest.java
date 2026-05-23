@@ -23,6 +23,9 @@ public class AiTestRequest {
         @JsonProperty("target_branch")
         String targetBranch;
 
+        @JsonProperty("base_url")
+        String baseUrl;
+
         @JsonProperty("requirement")
         String requirement;
 

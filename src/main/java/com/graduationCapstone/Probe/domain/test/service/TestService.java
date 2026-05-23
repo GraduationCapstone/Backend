@@ -61,7 +61,8 @@ public class TestService {
                     serial,
                     serialInfo.getTestItem(),
                     dto.targetBranch(),
-                    dto.targetRepoId()
+                    dto.targetRepoId(),
+                    dto.optionalServerUrl()
             );
 
             // 에이전트가 만든 실행 엔티티를 찾아 그룹과 이름을 동기화합니다.
@@ -189,7 +190,7 @@ public class TestService {
                         .map(res -> new TestCaseSummaryDto(
                                 res.getResultId(),
                                 res.getFullTestCaseId(),
-                                res.getTestCodeName(),
+                                res.getCaseName(),
                                 res.getStatus().name(),
                                 formatDuration(res.getDurationSeconds()),
                                 exec.getTesterName(),

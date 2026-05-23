@@ -73,7 +73,7 @@ public class AgentDispatchService {
      */
     @Transactional
     public Long dispatchPlan(User user, Long projectId, String scenarioSerial,
-                             String testItem, String targetBranch, Long targetRepoId) {
+                             String testItem, String targetBranch, Long targetRepoId, String baseUrl) {
         log.info("Dispatching plan. ProjectId={}, Serial={}, TestItem={}", projectId, scenarioSerial, testItem);
 
         // 1. 시나리오 시리얼 조회
@@ -130,6 +130,7 @@ public class AgentDispatchService {
                 execution.getExecutionId(),
                 targetRepo.getRepoUrl(),
                 targetBranch,
+                baseUrl,
                 requirement,
                 scenario.getAuthToken(),
                 callbackUrl,
