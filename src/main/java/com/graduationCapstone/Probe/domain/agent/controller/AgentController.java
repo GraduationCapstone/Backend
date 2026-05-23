@@ -53,7 +53,8 @@ public class AgentController {
                 requestDto.scenarioSerial(),
                 requestDto.testItem(),
                 requestDto.targetBranch(),
-                requestDto.targetRepoId()
+                requestDto.targetRepoId(),
+                requestDto.optionalServerUrl()
         );
 
         return ResponseEntity.accepted().body(Map.of("executionId", executionId));

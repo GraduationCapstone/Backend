@@ -22,6 +22,8 @@ public record AgentPlanTriggerRequestDto(
         String targetBranch,
 
         @NotNull(message = "타겟 레포지토리 ID는 필수입니다.")
-        Long targetRepoId
+        Long targetRepoId,
+
+        String optionalServerUrl
 ) {
 }
