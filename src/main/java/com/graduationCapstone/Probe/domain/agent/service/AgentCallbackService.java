@@ -94,18 +94,44 @@ public class AgentCallbackService {
         // 개별 TestResult 저장
         if (dto.results() != null && !dto.results().isEmpty()) {
             List<TestResult> results = dto.results().stream()
-                    .map(r -> TestResult.builder()
-                            .testExecution(execution)
-                            .testCaseNumber(r.testCaseNumber())
-                            .caseName(r.caseName())
-                            .testCodeName(r.testCodeName())
-                            .status(r.status())
-                            .durationSeconds(r.durationSeconds())
-                            .errorLog(r.errorLog())
-                            .testCode(r.testCode())
-                            .scenarioDetail(r.scenarioDetail())
-                            .screenshotS3Urls(r.screenshotS3Urls())
-                            .build())
+                    .map(r -> {
+                        // [시리얼 제거] "TXXXX_XX - "시리얼을 제외한 이름만 추출
+                        String rawCodeName = r.testCodeName();
+                        String cleanCodeName = rawCodeName;
+                        if (rawCodeName != null) {
+                            cleanCodeName = rawCodeName.replaceAll("^T\\d{4}_\\d{2}\\s*-\\s*", "");
+                        }
+
+                        // ScenarioDetailData 파싱
+                        com.graduationCapstone.Probe.domain.test.entity.ScenarioDetailData embeddedDetail = null;
+                        if (r.scenarioDetail() != null) {
+                            var sd = r.scenarioDetail();
+                            embeddedDetail = new com.graduationCapstone.Probe.domain.test.entity.ScenarioDetailData(
+                                    sd.scenarioName(),     // 테스트 시나리오명
+                                    sd.description(),      // 설명
+                                    sd.testCaseId(),       // 테스트 케이스 ID
+                                    r.caseName(),          // 테스트 케이스명 (대시보드 목록의 caseName 매핑)
+                                    sd.precondition(),     // 전제 조건
+                                    sd.testData(),         // 테스트 데이터
+                                    sd.executionSteps(),   // 실행 단계
+                                    sd.result()            // 결과
+                            );
+                        }
+
+                        // TestResult 엔티티 객체 생성 및 정제된 값 주입
+                        return TestResult.builder()
+                                .testExecution(execution)
+                                .testCaseNumber(r.testCaseNumber())
+                                .caseName(r.caseName())
+                                .testCodeName(cleanCodeName) // 정제된 이름 저장
+                                .status(r.status())
+                                .durationSeconds(r.durationSeconds())
+                                .errorLog(r.errorLog())
+                                .testCode(r.testCode())
+                                .scenarioDetail(embeddedDetail) // 바인딩된 객체 주입
+                                .screenshotS3Urls(r.screenshotS3Urls())
+                                .build();
+                    })
                     .toList();
 
             testResultRepository.saveAll(results);
