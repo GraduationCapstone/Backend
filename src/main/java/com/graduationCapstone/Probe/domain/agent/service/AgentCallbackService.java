@@ -95,40 +95,50 @@ public class AgentCallbackService {
         if (dto.results() != null && !dto.results().isEmpty()) {
             List<TestResult> results = dto.results().stream()
                     .map(r -> {
-                        // [시리얼 제거] "TXXXX_XX - "시리얼을 제외한 이름만 추출
-                        String rawCodeName = r.testCodeName();
-                        String cleanCodeName = rawCodeName;
-                        if (rawCodeName != null) {
-                            cleanCodeName = rawCodeName.replaceAll("^T\\d{4}_\\d{2}\\s*-\\s*", "");
+                        // caseName과 testCodeName 모두에서 시리얼 제거
+                        String cleanCaseName = r.caseName();
+                        String cleanTestCodeName = r.testCodeName();
+
+                        // 시리얼(TXXXX_XX - ) 제거
+                        String serial = "^T\\d{4}_\\d{2}\\s*-\\s*";
+
+                        if (cleanCaseName != null) {
+                            cleanCaseName = cleanCaseName.replaceAll(serial, "");
+                        }
+                        if (cleanTestCodeName != null) {
+                            cleanTestCodeName = cleanTestCodeName.replaceAll(serial, "");
                         }
 
-                        // ScenarioDetailData 파싱
+                        // 변환 후에도 비어있는 경우 방지
+                        if (cleanCaseName == null || cleanCaseName.isBlank()) cleanCaseName = cleanTestCodeName;
+                        if (cleanTestCodeName == null || cleanTestCodeName.isBlank()) cleanTestCodeName = cleanCaseName;
+
+                        // ScenarioDetailData 객체
                         com.graduationCapstone.Probe.domain.test.entity.ScenarioDetailData embeddedDetail = null;
                         if (r.scenarioDetail() != null) {
                             var sd = r.scenarioDetail();
                             embeddedDetail = new com.graduationCapstone.Probe.domain.test.entity.ScenarioDetailData(
-                                    sd.scenarioName(),     // 테스트 시나리오명
-                                    sd.description(),      // 설명
-                                    sd.testCaseId(),       // 테스트 케이스 ID
-                                    r.caseName(),          // 테스트 케이스명 (대시보드 목록의 caseName 매핑)
-                                    sd.precondition(),     // 전제 조건
-                                    sd.testData(),         // 테스트 데이터
-                                    sd.executionSteps(),   // 실행 단계
-                                    sd.result()            // 결과
+                                    sd.scenarioName(),
+                                    sd.description(),
+                                    sd.testCaseId(),
+                                    cleanCaseName,
+                                    sd.precondition(),
+                                    sd.testData(),
+                                    sd.executionSteps(),
+                                    sd.result()
                             );
                         }
 
-                        // TestResult 엔티티 객체 생성 및 정제된 값 주입
                         return TestResult.builder()
                                 .testExecution(execution)
                                 .testCaseNumber(r.testCaseNumber())
-                                .caseName(r.caseName())
-                                .testCodeName(cleanCodeName) // 정제된 이름 저장
+                                .caseName(cleanCaseName)
+                                .testCodeName(cleanTestCodeName)
                                 .status(r.status())
                                 .durationSeconds(r.durationSeconds())
                                 .errorLog(r.errorLog())
                                 .testCode(r.testCode())
-                                .scenarioDetail(embeddedDetail) // 바인딩된 객체 주입
+                                .scenarioDetail(embeddedDetail)
                                 .screenshotS3Urls(r.screenshotS3Urls())
                                 .build();
                     })
