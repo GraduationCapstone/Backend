@@ -100,7 +100,7 @@ public class AgentCallbackService {
                         String cleanTestCodeName = r.testCodeName();
 
                         // 시리얼(TXXXX_XX - ) 제거
-                        String serial = "^T\\d{4}_\\d{2}\\s*-\\s*";
+                        String serial = "^T\\d{4}_\\d{2}\\s*";
 
                         if (cleanCaseName != null) {
                             cleanCaseName = cleanCaseName.replaceAll(serial, "");
