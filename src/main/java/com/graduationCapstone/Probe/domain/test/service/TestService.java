@@ -190,7 +190,7 @@ public class TestService {
                         .map(res -> new TestCaseSummaryDto(
                                 res.getResultId(),
                                 res.getFullTestCaseId(),
-                                res.getCaseName(),
+                                res.getTestCodeName(),
                                 res.getStatus().name(),
                                 formatDuration(res.getDurationSeconds()),
                                 exec.getTesterName(),
