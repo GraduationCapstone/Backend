@@ -73,7 +73,7 @@ public class AgentDispatchService {
      */
     @Transactional
     public Long dispatchPlan(User user, Long projectId, String scenarioSerial,
-                             String testItem, String targetBranch, Long targetRepoId, String baseUrl) {
+                             String testItem, String targetBranch, Long targetRepoId, String baseUrl, String groupName) {
         log.info("Dispatching plan. ProjectId={}, Serial={}, TestItem={}", projectId, scenarioSerial, testItem);
 
         // 1. 시나리오 시리얼 조회
@@ -135,7 +135,8 @@ public class AgentDispatchService {
                 scenario.getAuthToken(),
                 callbackUrl,
                 serial.getCode(),
-                String.format("%02d", attempt)
+                String.format("%02d", attempt),
+                groupName
         );
 
         // 7. AI 서버 호출 (비동기)

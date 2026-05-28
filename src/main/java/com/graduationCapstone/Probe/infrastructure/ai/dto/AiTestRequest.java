@@ -40,4 +40,7 @@ public class AiTestRequest {
 
         @JsonProperty("scenario_attempt")
         String scenarioAttempt;
+
+        @JsonProperty("group_name")
+        String groupName;
 }

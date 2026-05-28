@@ -62,7 +62,8 @@ public class TestService {
                     serialInfo.getTestItem(),
                     dto.targetBranch(),
                     dto.targetRepoId(),
-                    dto.optionalServerUrl()
+                    dto.optionalServerUrl(),
+                    dto.baseTestGroupName()
             );
 
             // 에이전트가 만든 실행 엔티티를 찾아 그룹과 이름을 동기화합니다.
