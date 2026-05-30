@@ -69,6 +69,9 @@ public class AgentDispatchService {
      * @param scenarioSerial   시나리오시리얼 번호
      * @param testItem     시나리오 가이드 이름 (예: "회원가입")
      * @param targetBranch 테스트 대상 브랜치
+     * @param targetRepoId 레포지토리 ID
+     * @param baseUrl      테스트 대상 기본 URL
+     * @param groupName    테스트 그룹명
      * @return 생성된 TestExecution의 ID
      */
     @Transactional
@@ -136,7 +139,8 @@ public class AgentDispatchService {
                 callbackUrl,
                 serial.getCode(),
                 String.format("%02d", attempt),
-                groupName
+                groupName,
+                execution.getTesterName()
         );
 
         // 7. AI 서버 호출 (비동기)

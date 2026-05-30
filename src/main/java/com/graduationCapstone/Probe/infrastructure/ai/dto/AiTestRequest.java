@@ -43,4 +43,7 @@ public class AiTestRequest {
 
         @JsonProperty("group_name")
         String groupName;
+
+        @JsonProperty("tester_name")
+        String testerName;
 }
