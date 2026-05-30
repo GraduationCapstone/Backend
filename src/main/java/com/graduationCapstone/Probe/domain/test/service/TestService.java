@@ -163,6 +163,7 @@ public class TestService {
                     long total = counts.values().stream().mapToLong(l -> l).sum();
 
                     return new TestExecutionListDto(
+                            e.getExecutionId(),
                             e.getTestGroup() != null ? e.getTestGroup().getGroupId() : null,
                             e.getTestScenarioId(),
                             e.getTestGroup() != null ? e.getTestGroup().getGroupName() : e.getTestName(),
