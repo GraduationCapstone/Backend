@@ -47,7 +47,7 @@ public class TestResult {
 
     /** 수정 가능한 테스트 코드명 (대시보드에 표시) */
     @Column(name = "test_code_name", length = 200)
-    private String CaseName;
+    private String testCodeName;
 
     /** PASS, BLOCK, FAIL, UNTEST */
     @Enumerated(EnumType.STRING)
