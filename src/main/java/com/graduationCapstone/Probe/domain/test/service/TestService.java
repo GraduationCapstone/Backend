@@ -168,7 +168,7 @@ public class TestService {
                             e.getExecutionId(),
                             e.getTestGroup() != null ? e.getTestGroup().getGroupId() : null,
                             e.getTestScenarioId(),
-                            e.getTestGroup() != null ? e.getTestGroup().getGroupName() : e.getTestName(),
+                            e.getTestName(),
                             calculateRatio(pass, total),
                             formatDuration(e.getDurationSeconds()),
                             e.getTesterName(),
