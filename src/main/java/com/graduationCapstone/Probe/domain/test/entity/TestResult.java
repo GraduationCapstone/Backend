@@ -103,8 +103,8 @@ public class TestResult {
     }
 
     /** 테스트 코드명 수정 */
-    public void updateTestCodeName(String testCodeName) {
-        this.testCodeName = testCodeName;
+    public void updateTestCodeName(String caseName) {
+        this.caseName = caseName;
     }
 
     /** 테스트케이스ID 반환 */

@@ -104,7 +104,7 @@ public class TestController {
             throw new CustomException(ErrorCode.ACCESS_DENIED);
         }
 
-        r.updateTestCodeName(dto.newTestCodeName());
+        r.updateTestCodeName(dto.CaseName());
         resultRepo.save(r);
         return ResponseEntity.ok().build();
     }
