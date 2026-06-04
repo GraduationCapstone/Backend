@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.Map;
 
@@ -242,10 +243,13 @@ public class TestService {
      */
     public String formatDuration(Double sec) {
         if (sec == null || sec == 0) return "0s";
-        int totalSec = sec.intValue();
-        int minutes = totalSec / 60;
-        int seconds = totalSec % 60;
-        return (minutes == 0) ? seconds + "s" : String.format("%dm %ds", minutes, seconds);
+
+        int minutes = (int) (sec / 60);
+        double seconds = sec % 60;
+
+        DecimalFormat df = new DecimalFormat("0.#");
+
+        return (minutes == 0) ? df.format(seconds) + "s" : String.format("%dm %ss", minutes, df.format(seconds));
     }
 
     /**
