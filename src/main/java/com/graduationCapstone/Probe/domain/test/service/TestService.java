@@ -249,11 +249,16 @@ public class TestService {
         int minutes = (int) (sec / 60);
         double seconds = sec % 60;
 
-        DecimalFormat df = new DecimalFormat("0.#");
-
-        return (minutes == 0) ? df.format(seconds) + "s" : String.format("%dm %ss", minutes, df.format(seconds));
+        // 1분이 안 넘을 경우 (소수점 1자리까지 표시)
+        if (minutes == 0) {
+            DecimalFormat df = new DecimalFormat("0.#");
+            return df.format(seconds) + "s";
+        }
+        // 1분이 넘어갈 경우 (초 단위는 소수점 버림)
+        else {
+            return String.format("%dm %ds", minutes, (int) seconds);
+        }
     }
-
     /**
      * 날짜별 평균 테스트 시간 조회
      */
