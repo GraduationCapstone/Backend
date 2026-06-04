@@ -71,12 +71,12 @@ public class AgentDispatchService {
      * @param targetBranch 테스트 대상 브랜치
      * @param targetRepoId 레포지토리 ID
      * @param baseUrl      테스트 대상 기본 URL
-     * @param groupName    테스트 그룹명
+     * @param executionName    테스트 그룹명
      * @return 생성된 TestExecution의 ID
      */
     @Transactional
     public Long dispatchPlan(User user, Long projectId, String scenarioSerial,
-                             String testItem, String targetBranch, Long targetRepoId, String baseUrl, String groupName) {
+                             String testItem, String targetBranch, Long targetRepoId, String baseUrl, String executionName) {
         log.info("Dispatching plan. ProjectId={}, Serial={}, TestItem={}", projectId, scenarioSerial, testItem);
 
         // 1. 시나리오 시리얼 조회
@@ -139,7 +139,7 @@ public class AgentDispatchService {
                 callbackUrl,
                 serial.getCode(),
                 String.format("%02d", attempt),
-                groupName,
+                executionName,
                 execution.getTesterName()
         );
 

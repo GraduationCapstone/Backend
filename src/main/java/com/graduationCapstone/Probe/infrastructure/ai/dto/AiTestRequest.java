@@ -41,8 +41,8 @@ public class AiTestRequest {
         @JsonProperty("scenario_attempt")
         String scenarioAttempt;
 
-        @JsonProperty("group_name")
-        String groupName;
+        @JsonProperty("execution_name")
+        String executionName;
 
         @JsonProperty("tester_name")
         String testerName;
