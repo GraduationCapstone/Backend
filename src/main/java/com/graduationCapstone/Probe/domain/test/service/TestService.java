@@ -72,7 +72,8 @@ public class TestService {
                     .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
 
             // 테스트 그룹 엔티티와 그룹명 스냅샷을 강제로 주입하여 교정합니다.
-            execution.updateGroupAndName(group, group.getGroupName());
+            String executionName = group.getGroupName() + " (" + serialInfo.getTestItem() + ")";
+            execution.updateGroupAndName(group, executionName);
 
             executionIds.add(executionId);
 
