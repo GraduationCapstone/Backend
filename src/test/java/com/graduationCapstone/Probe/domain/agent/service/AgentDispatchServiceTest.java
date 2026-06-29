@@ -10,7 +10,6 @@ import com.graduationCapstone.Probe.domain.project.repository.ScenarioRepository
 import com.graduationCapstone.Probe.domain.test.entity.ExecutionStatus;
 import com.graduationCapstone.Probe.domain.test.entity.ScenarioSequence;
 import com.graduationCapstone.Probe.domain.test.entity.TestExecution;
-import com.graduationCapstone.Probe.domain.test.entity.TestGroup;
 import com.graduationCapstone.Probe.domain.test.repository.ScenarioSequenceRepository;
 import com.graduationCapstone.Probe.domain.test.repository.TestExecutionRepository;
 import com.graduationCapstone.Probe.domain.user.entity.User;
@@ -112,6 +111,8 @@ class AgentDispatchServiceTest {
             String testItem = "회원가입";
             String targetBranch = "feature/login";
             Long targetRepoId = 2L;
+            String baseUrl = "http://localhost:8080";
+            String executionName = "TestGroup (회원가입)";
 
             // ScenarioSequence가 없는 경우 → 새로 생성
             given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, "01"))
@@ -154,7 +155,7 @@ class AgentDispatchServiceTest {
 
             // when
             Long executionId = agentDispatchService.dispatchPlan(
-                    testUser, projectId, scenarioSerial, testItem, targetBranch, targetRepoId);
+                    testUser, projectId, scenarioSerial, testItem, targetBranch, targetRepoId, baseUrl, executionName);
 
             // then — TestExecution 생성 확인
             ArgumentCaptor<TestExecution> executionCaptor = ArgumentCaptor.forClass(TestExecution.class);
@@ -179,12 +180,15 @@ class AgentDispatchServiceTest {
             String body = request.getBody().readUtf8();
             assertThat(body).contains("\"execution_id\":1");
             assertThat(body).contains("\"repository_url\":\"https://github.com/school/target-repo.git\"");
-            assertThat(body).contains("\"branch\":\"feature/login\"");
+            assertThat(body).contains("\"target_branch\":\"feature/login\"");
+            assertThat(body).contains("http://localhost:8080");
             assertThat(body).contains("\"requirement\":\"회원가입 버튼을 누른다\"");
             assertThat(body).contains("\"auth_token\":\"Bearer test-token-123\"");
             assertThat(body).contains("/api/agent/callback/plan");
             assertThat(body).contains("\"scenario_serial\":\"01\"");
             assertThat(body).contains("\"scenario_attempt\":\"01\"");
+            assertThat(body).contains("TestGroup (회원가입)");
+            assertThat(body).contains("tester");
         }
 
         @Test
@@ -194,6 +198,8 @@ class AgentDispatchServiceTest {
             Long projectId = 100L;
             String scenarioSerial = "01";
             Long targetRepoId = 2L;
+            String baseUrl = "http://localhost:8080";
+            String executionName = "TestGroup (회원가입)";
 
             ScenarioSequence existingSequence = ScenarioSequence.builder()
                     .projectId(projectId)
@@ -202,7 +208,6 @@ class AgentDispatchServiceTest {
                     .build();
             given(scenarioSequenceRepository.findByProjectIdAndScenarioSerialForUpdate(projectId, "01"))
                     .willReturn(Optional.of(existingSequence));
-            given(scenarioSequenceRepository.save(any(ScenarioSequence.class))).willReturn(existingSequence);
 
             given(testExecutionRepository.save(any(TestExecution.class))).willAnswer(invocation -> {
                 TestExecution te = invocation.getArgument(0);
@@ -226,7 +231,7 @@ class AgentDispatchServiceTest {
             mockWebServer.enqueue(new MockResponse().setResponseCode(202));
 
             // when
-            agentDispatchService.dispatchPlan(testUser, projectId, scenarioSerial, "회원가입", "main", targetRepoId);
+            agentDispatchService.dispatchPlan(testUser, projectId, scenarioSerial, "회원가입", "main", targetRepoId, baseUrl, executionName);
 
             // then — attempt가 4로 증가
             ArgumentCaptor<TestExecution> captor = ArgumentCaptor.forClass(TestExecution.class);
@@ -238,9 +243,13 @@ class AgentDispatchServiceTest {
         @Test
         @DisplayName("알 수 없는 testItem이면 IllegalArgumentException 발생")
         void dispatchPlan_unknownTestItem_throwsException() {
+            Scenario mockScenario = Scenario.builder().scenarioId(1L).build();
+            given(scenarioRepository.findByProjectIdAndScenarioSerial(100L, "01"))
+                    .willReturn(Optional.of(mockScenario));
+
             // when & then
             assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
-                    testUser, 100L, "01", "존재하지 않는 시나리오", "main", 2L))
+                    testUser, 100L, "01", "존재하지 않는 시나리오", "main", 2L, "http://localhost", "TestGroup"))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -270,7 +279,7 @@ class AgentDispatchServiceTest {
 
             // when & then
             assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
-                    testUser, projectId, scenarioSerial, "회원가입", "main", targetRepoId))
+                    testUser, projectId, scenarioSerial, "회원가입", "main", targetRepoId, "http://localhost", "TestGroup"))
                     .isInstanceOf(CustomException.class)
                     .extracting(e -> ((CustomException) e).getErrorCode())
                     .isEqualTo(ErrorCode.RESOURCE_NOT_FOUND);
@@ -307,7 +316,7 @@ class AgentDispatchServiceTest {
 
             // when & then
             assertThatThrownBy(() -> agentDispatchService.dispatchPlan(
-                    testUser, projectId, scenarioSerial, "회원가입", "main", targetRepoId))
+                    testUser, projectId, scenarioSerial, "회원가입", "main", targetRepoId, "http://localhost", "TestGroup"))
                     .isInstanceOf(CustomException.class)
                     .extracting(e -> ((CustomException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_ARGUMENT);
@@ -326,14 +335,9 @@ class AgentDispatchServiceTest {
         void dispatchTest_success() throws InterruptedException {
             // given
             Long executionId = 1L;
-            Long projectId = 100L;
-            Long targetRepoId = 2L;
+
             User tester = User.builder()
                     .id(1L).githubId("12345").username("tester").email("tester@test.com").build();
-
-            TestGroup mockGroup = TestGroup.builder()
-                    .targetRepoId(targetRepoId)
-                    .build();
 
             TestExecution execution = TestExecution.builder()
                     .executionId(executionId)
@@ -346,13 +350,7 @@ class AgentDispatchServiceTest {
                     .status(ExecutionStatus.PLAN_COMPLETED)
                     .build();
 
-            ReflectionTestUtils.setField(execution, "testGroup", mockGroup);
-
             given(testExecutionRepository.findActiveById(executionId)).willReturn(Optional.of(execution));
-
-            GithubRepository mockRepo = GithubRepository.builder()
-                    .repoUrl("https://github.com/school/target-repo.git").build();
-            given(githubRepositoryRepository.findByProjectIdAndGithubRepoId(projectId, targetRepoId)).willReturn(Optional.of(mockRepo));
 
             mockWebServer.enqueue(new MockResponse().setResponseCode(202));
 
@@ -361,7 +359,6 @@ class AgentDispatchServiceTest {
 
             // then
             assertThat(execution.getStatus()).isEqualTo(ExecutionStatus.TESTING);
-            verify(testExecutionRepository).save(execution);
 
             RecordedRequest request = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
             assertThat(request).isNotNull();
@@ -371,8 +368,6 @@ class AgentDispatchServiceTest {
             String body = request.getBody().readUtf8();
             assertThat(body).contains("\"execution_id\":1");
             assertThat(body).contains("/api/agent/callback/test");
-            assertThat(body).contains("\"scenario_serial\":\"01\"");
-            assertThat(body).contains("\"scenario_attempt\":\"01\"");
         }
 
         @Test
