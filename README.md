@@ -64,6 +64,7 @@ Probe 서비스의 **백엔드 API 서버**입니다.<br>
 | **HTTP Client** | ![WebFlux](assets/badges/webflux.svg) |
 | **Mail / Template** | ![Gmail](assets/badges/gmail.svg) ![Thymeleaf](assets/badges/thymeleaf.svg) |
 | **Infra / CI·CD** | ![AWS EC2](assets/badges/aws-ec2.svg) ![AWS S3](assets/badges/aws-s3.svg) ![Docker](assets/badges/docker.svg) ![GitHub Actions](assets/badges/github-actions.svg) |
+| **AI Agent (연동 서버)** | ![Python](assets/badges/python.svg) ![DSPy](assets/badges/dspy.svg) ![LangChain](assets/badges/langchain.svg) ![FAISS](assets/badges/faiss.svg) ![Playwright](assets/badges/playwright.svg) |
 | **Docs / Test** | ![Swagger](assets/badges/swagger.svg) ![JUnit5](assets/badges/junit5.svg) |
 
 <br>
@@ -245,7 +246,7 @@ com.graduationCapstone.Probe
 | 저장소 | 역할 |
 |---|---|
 | [Frontend](https://github.com/GraduationCapstone/Frontend) | 웹 클라이언트 (React, TypeScript, Vite) |
-| [AI](https://github.com/GraduationCapstone/AI) | 테스트 계획 생성과 Playwright 실행을 맡는 AI Agent 서버 |
+| [AI](https://github.com/GraduationCapstone/AI) | 테스트 계획 생성과 Playwright 실행을 맡는 AI Agent 서버 (Python, DSPy, LangChain, FAISS) |
 | **Backend** | 이 저장소 |
 
 <br>
