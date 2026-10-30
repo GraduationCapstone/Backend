@@ -64,7 +64,6 @@ Probe 서비스의 **백엔드 API 서버**입니다.<br>
 | **HTTP Client** | ![WebFlux](assets/badges/webflux.svg) |
 | **Mail / Template** | ![Gmail](assets/badges/gmail.svg) ![Thymeleaf](assets/badges/thymeleaf.svg) |
 | **Infra / CI·CD** | ![AWS EC2](assets/badges/aws-ec2.svg) ![AWS S3](assets/badges/aws-s3.svg) ![Docker](assets/badges/docker.svg) ![GitHub Actions](assets/badges/github-actions.svg) |
-| **AI Agent (연동 서버)** | ![Python](assets/badges/python.svg) ![DSPy](assets/badges/dspy.svg) ![LangChain](assets/badges/langchain.svg) ![FAISS](assets/badges/faiss.svg) ![Playwright](assets/badges/playwright.svg) |
 | **Docs / Test** | ![Swagger](assets/badges/swagger.svg) ![JUnit5](assets/badges/junit5.svg) |
 
 <br>
@@ -73,7 +72,7 @@ Probe 서비스의 **백엔드 API 서버**입니다.<br>
 
 ### 시스템 구성
 
-[![Probe 시스템 아키텍처](assets/probe-architecture.png)](assets/probe-architecture.png)
+[![Probe 시스템 아키텍처](assets/architecture.png)](assets/architecture.png)
 
 - **Frontend → Backend** 모든 요청은 REST로 들어오고 JWT(Authorization 헤더 또는 `access_token` 쿠키)로 인증합니다.
 - **Backend → GitHub** OAuth2 로그인 때 받은 GitHub 토큰으로 사용자의 저장소 목록과 코드를 조회합니다.
@@ -83,7 +82,7 @@ Probe 서비스의 **백엔드 API 서버**입니다.<br>
 
 ### 테스트 실행 흐름
 
-[![Probe 테스트 실행 흐름](assets/probe-test-flow.png)](assets/probe-test-flow.png)
+[![Probe 테스트 실행 흐름](assets/test-flow.png)](assets/test-flow.png)
 
 테스트 1회 실행(`TestExecution`)은 아래 상태를 거칩니다. 프론트는 상태 조회 API를 폴링하며 다음 단계로 넘어갑니다.
 
