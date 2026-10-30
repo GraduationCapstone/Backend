@@ -9,12 +9,12 @@ Probe 서비스의 **백엔드 API 서버**입니다.<br>
 
 <br>
 
-![Java](https://img.shields.io/badge/Java-21-orange?style=flat-square&logo=openjdk&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.7-6DB33F?style=flat-square&logo=springboot&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
-![AWS EC2](https://img.shields.io/badge/AWS%20EC2-FF9900?style=flat-square&logo=amazonec2&logoColor=white)
+![Java](assets/badges/java-21-sm.svg)
+![Spring Boot](assets/badges/spring-boot-3-5-7-sm.svg)
+![PostgreSQL](assets/badges/postgresql-sm.svg)
+![Redis](assets/badges/redis-sm.svg)
+![Docker](assets/badges/docker-sm.svg)
+![AWS EC2](assets/badges/aws-ec2-sm.svg)
 
 </div>
 
@@ -48,13 +48,13 @@ Probe 서비스의 **백엔드 API 서버**입니다.<br>
 
 | 구분 | 기술 |
 |---|---|
-| **Language / Framework** | ![Java](https://img.shields.io/badge/Java%2021-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot%203.5-6DB33F?style=for-the-badge&logo=springboot&logoColor=white) ![Gradle](https://img.shields.io/badge/Gradle-02303A?style=for-the-badge&logo=gradle&logoColor=white) |
-| **Security** | ![Spring Security](https://img.shields.io/badge/Spring%20Security-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white) ![OAuth2](https://img.shields.io/badge/OAuth2-F78C40?style=for-the-badge&logo=openid&logoColor=white) ![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white) |
-| **Persistence** | ![Spring Data JPA](https://img.shields.io/badge/Spring%20Data%20JPA-6DB33F?style=for-the-badge&logo=spring&logoColor=white) ![QueryDSL](https://img.shields.io/badge/QueryDSL%205.1-0769AD?style=for-the-badge&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) |
-| **Cache / Store** | ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white) |
-| **External Call** | ![WebFlux](https://img.shields.io/badge/WebFlux-6DB33F?style=for-the-badge&logo=spring&logoColor=white) ![Gmail](https://img.shields.io/badge/Gmail-EA4335?style=for-the-badge&logo=gmail&logoColor=white) ![Thymeleaf](https://img.shields.io/badge/Thymeleaf-005F0F?style=for-the-badge&logo=thymeleaf&logoColor=white) |
-| **Infra / CI·CD** | ![AWS EC2](https://img.shields.io/badge/AWS%20EC2-FF9900?style=for-the-badge&logo=amazonec2&logoColor=white) ![AWS S3](https://img.shields.io/badge/AWS%20S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) |
-| **Docs / Test** | ![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black) ![JUnit5](https://img.shields.io/badge/JUnit5-25A162?style=for-the-badge&logo=junit5&logoColor=white) |
+| **Language / Framework** | ![Java](assets/badges/java-21.svg) ![Spring Boot](assets/badges/spring-boot-3-5.svg) ![Gradle](assets/badges/gradle.svg) |
+| **Security** | ![Spring Security](assets/badges/spring-security.svg) ![OAuth2](assets/badges/oauth2.svg) ![JWT](assets/badges/jwt.svg) |
+| **Persistence** | ![Spring Data JPA](assets/badges/spring-data-jpa.svg) ![QueryDSL](assets/badges/querydsl-5-1.svg) ![PostgreSQL](assets/badges/postgresql.svg) |
+| **Cache / Store** | ![Redis](assets/badges/redis.svg) |
+| **External Call** | ![WebFlux](assets/badges/webflux.svg) ![Gmail](assets/badges/gmail.svg) ![Thymeleaf](assets/badges/thymeleaf.svg) |
+| **Infra / CI·CD** | ![AWS EC2](assets/badges/aws-ec2.svg) ![AWS S3](assets/badges/aws-s3.svg) ![Docker](assets/badges/docker.svg) ![GitHub Actions](assets/badges/github-actions.svg) |
+| **Docs / Test** | ![Swagger](assets/badges/swagger.svg) ![JUnit5](assets/badges/junit5.svg) |
 
 <br>
 
