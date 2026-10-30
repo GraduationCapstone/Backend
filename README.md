@@ -7,15 +7,6 @@
 Probe 서비스의 **백엔드 API 서버**입니다.<br>
 테스트 계획서 생성과 Playwright 실행은 별도 AI Agent 서버가 맡고, 이 서버는 사용자, 프로젝트, 테스트 실행 이력과 결과를 관리하며 AI 서버와 HTTP 디스패치·콜백으로 연동합니다.
 
-<br>
-
-![Java](assets/badges/java-21-sm.svg)
-![Spring Boot](assets/badges/spring-boot-3-5-7-sm.svg)
-![PostgreSQL](assets/badges/postgresql-sm.svg)
-![Redis](assets/badges/redis-sm.svg)
-![Docker](assets/badges/docker-sm.svg)
-![AWS EC2](assets/badges/aws-ec2-sm.svg)
-
 </div>
 
 <br>
@@ -28,6 +19,10 @@ Probe 서비스의 **백엔드 API 서버**입니다.<br>
 - 🧭 **선택** 26개 표준 시나리오(회원가입, 검색, 파일 업로드 등) 중 필요한 것을 고릅니다.
 - 🤖 **생성·실행** AI Agent가 저장소 코드를 읽고 테스트 계획서를 만든 뒤 Playwright로 실행합니다.
 - 📊 **확인** 케이스별 Pass/Fail, 실행 코드, 스크린샷, 계획서와 결과 보고서를 대시보드에서 봅니다.
+
+[![Probe 테스트 결과 대시보드](assets/probe-dashboard.png)](assets/probe-dashboard.png)
+
+<sub>테스트 그룹 결과 화면. 왼쪽은 Pass 비율과 테스트 코드 목록, 오른쪽은 선택한 케이스의 상태와 Playwright 테스트 코드입니다.</sub>
 
 <br>
 
@@ -42,6 +37,20 @@ Probe 서비스의 **백엔드 API 서버**입니다.<br>
 | **AI Agent 연동** | 계획서 생성 → 테스트 실행 2단계 디스패치, 콜백으로 결과와 S3 산출물 URL 수신 |
 | **대시보드** | 테스트 그룹·결과 목록, Pass 비율, 일별 평균 소요 시간, 케이스별 상세(시나리오·코드·스크린샷) |
 
+<details>
+<summary><b>기본 테스트 시나리오 26종</b></summary>
+
+| 분류 | 시나리오 |
+|---|---|
+| 회원 | 01 회원가입, 02 로그인, 03 비밀번호 찾기, 04 로그아웃 |
+| 사용자 정보 / 권한 | 05 프로필 수정, 06 비밀번호 변경, 07 권한 기반 접근 제어, 08 세션 만료 / 토큰 만료 |
+| 게시판 / 콘텐츠 | 09 게시글 작성, 10 게시글 수정 / 삭제, 11 댓글 작성 / 수정 / 삭제, 12 좋아요 / 즐겨찾기, 13 검색, 14 필터 / 정렬 |
+| UI / UX / 브라우저 | 15 반응형 레이아웃, 16 브라우저 호환성, 17 404 / 500 에러 페이지 동작 |
+| 네트워크 / 예외 | 18 네트워크 끊김 상태, 19 서버 응답 지연, 20 API 에러 응답 처리 |
+| 그 외 | 21 A/B 테스트 요소 확인, 22 입력값 유효성 검사, 23 다국어 언어 변경, 24 파일 업로드 / 다운로드, 25 푸시 알림, 26 다중 사용자 동시 접속 |
+
+</details>
+
 <br>
 
 ## 🛠️ 기술 스택
@@ -52,7 +61,8 @@ Probe 서비스의 **백엔드 API 서버**입니다.<br>
 | **Security** | ![Spring Security](assets/badges/spring-security.svg) ![OAuth2](assets/badges/oauth2.svg) ![JWT](assets/badges/jwt.svg) |
 | **Persistence** | ![Spring Data JPA](assets/badges/spring-data-jpa.svg) ![QueryDSL](assets/badges/querydsl-5-1.svg) ![PostgreSQL](assets/badges/postgresql.svg) |
 | **Cache / Store** | ![Redis](assets/badges/redis.svg) |
-| **External Call** | ![WebFlux](assets/badges/webflux.svg) ![Gmail](assets/badges/gmail.svg) ![Thymeleaf](assets/badges/thymeleaf.svg) |
+| **HTTP Client** | ![WebFlux](assets/badges/webflux.svg) |
+| **Mail / Template** | ![Gmail](assets/badges/gmail.svg) ![Thymeleaf](assets/badges/thymeleaf.svg) |
 | **Infra / CI·CD** | ![AWS EC2](assets/badges/aws-ec2.svg) ![AWS S3](assets/badges/aws-s3.svg) ![Docker](assets/badges/docker.svg) ![GitHub Actions](assets/badges/github-actions.svg) |
 | **Docs / Test** | ![Swagger](assets/badges/swagger.svg) ![JUnit5](assets/badges/junit5.svg) |
 
@@ -92,6 +102,14 @@ PLAN_GENERATING ──▶ PLAN_COMPLETED ──▶ TESTING ──▶ COMPLETED
 
 > 콜백은 현재 상태가 맞을 때만 반영하므로, 같은 콜백이 두 번 와도 결과가 중복 저장되지 않습니다.
 
+### 데이터 모델
+
+[![Probe 핵심 데이터 모델](assets/probe-erd.png)](assets/probe-erd.png)
+
+- 핵심 테이블만 담았습니다. 시나리오 가이드(`Guide`, `Scenario`, `ScenarioGuide`), 실행 회차(`ScenarioSequence`), `RefreshToken` 등은 생략했습니다.
+- 점선은 JPA 연관관계 없이 ID 컬럼으로만 참조하는 관계입니다.
+- `TestGroup`, `TestExecution`, `TestResult`는 `deleted_at`으로 소프트 삭제합니다.
+
 ### 패키지 구조
 
 ```
@@ -110,6 +128,17 @@ com.graduationCapstone.Probe
     ├── exception   # ErrorCode, 전역 예외 처리
     └── init        # 시나리오 가이드 마스터 데이터 초기화
 ```
+
+<br>
+
+## 🔧 구현 포인트
+
+| 문제 | 해결 |
+|---|---|
+| 같은 시나리오를 동시에 실행하면 회차 번호(`T0103`의 `03`)가 겹칠 수 있음 | `ScenarioSequence`를 비관적 락(`PESSIMISTIC_WRITE`)으로 조회한 뒤 회차를 1 올림 |
+| 초대 링크를 여러 번 누르면 멤버가 중복 추가될 수 있음 | Redis `SETNX`로 `lock:project:join:{projectId}:{email}` 락(10초)을 잡은 뒤 가입 처리 |
+| AI 서버가 같은 콜백을 다시 보내면 결과가 두 번 저장될 수 있음 | 현재 실행 상태가 기대한 단계일 때만 콜백을 반영하고, 그 외는 무시 |
+| 계획서 생성과 테스트 실행은 수 분이 걸려 요청을 붙잡고 있을 수 없음 | `WebClient`로 논블로킹 디스패치 후 바로 응답, 결과는 콜백으로 수신. 호출 실패 시 `FAILED`로 전환 |
 
 <br>
 
@@ -162,13 +191,6 @@ com.graduationCapstone.Probe
 ./gradlew bootRun
 ```
 
-### Docker
-
-```bash
-docker build -t probe-backend .
-docker run -p 8080:8080 --env-file .env probe-backend
-```
-
 <br>
 
 ## 🔄 CI/CD
@@ -204,6 +226,17 @@ docker run -p 8080:8080 --env-file .env probe-backend
 
 - `main`에 직접 push하지 않고, 이슈 브랜치에서 작업한 뒤 PR로 머지합니다.
 - 이슈와 PR은 `.github`의 템플릿(feature / fix / maintenance)을 사용합니다.
+
+<br>
+
+## 👥 팀원
+
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/MAKC-KR1"><img src="https://github.com/MAKC-KR1.png" width="100" alt="MAKC"><br><b>MAKC</b></a><br>Backend</td>
+    <td align="center"><a href="https://github.com/DongWonLee2"><img src="https://github.com/DongWonLee2.png" width="100" alt="이동원"><br><b>이동원</b></a><br>Backend</td>
+  </tr>
+</table>
 
 <br>
 
